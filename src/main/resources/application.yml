@@ -1,0 +1,92 @@
+quarkus:
+  application:
+    name: admon-catalogo
+  http:
+    port: 8089
+    non-application-root-path: /q
+    # Configuración de CORS
+    cors:
+      ~: true  # Habilitar CORS para todas las rutas
+      origins: "*"  # Permitir todos los orígenes (puedes especificar URLs específicas)
+      # Para producción, reemplaza "*" con tus dominios específicos:
+      # origins: "http://localhost:3000,https://tu-dominio.com,https://app.tu-dominio.com"
+      methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      headers: "accept,authorization,content-type,x-requested-with"
+      exposed-headers: "Content-Disposition"
+      access-control-max-age: 24H
+      access-control-allow-credentials: false  # Cambiar a true si usas cookies/autenticación
+  # Deshabilitar Dev Services globalmente y para todas las extensiones
+  devservices:
+    enabled: false
+  test:
+    integration-test-profile: test
+  # Deshabilitar específicamente para PostgreSQL con todas las variantes
+  datasource:
+    devservices:
+      enabled: false
+    dev-services:
+      enabled: false
+    db-kind: postgresql
+    username: postgres
+    password: 12345
+    reactive:
+      url: postgresql://127.0.0.1:5432/walrex_db
+      max-size: 20
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+  # Deshabilitar Dev Services específicamente para Redis
+  redis:
+    devservices:
+      enabled: false
+    hosts: redis://127.0.0.1:6379
+    timeout: 10s
+    max-pool-size: 20
+    max-pool-waiting: 24
+  cache:
+    redis:
+      expire-after-write: 30m
+      prefix: "wx-admon"
+  micrometer:
+    enabled: true
+    registry-enabled-default: false
+    registry:
+      prometheus:
+        enabled: true
+    export:
+      prometheus:
+        path: /q/metrics
+    binder:
+      # JVM Metrics
+      jvm: true
+      # System Metrics
+      system: true
+      # HTTP Server Metrics
+      http-server:
+        enabled: true
+        max-uri-tags: 100
+      # HTTP Client Metrics
+      http-client:
+        enabled: true
+      # Vert.x Metrics (Event Loop)
+      vertx:
+        enabled: true
+      # Database Connection Pool Metrics
+      jdbc:
+        enabled: false  # Using reactive, not JDBC
+      # MP Metrics (MicroProfile)
+      mp-metrics:
+        enabled: true
+    binder-enabled-default: true
+
+  opentelemetry:
+    enabled: true
+    tracer:
+      exporter:
+        otlp:
+          endpoint: http://localhost:4317  # Changed from tempo:4317 for host-based Quarkus
+      sampler: parentbased_always_on
+
+  # SmallRye Fault Tolerance Metrics
+  smallrye-fault-tolerance:
+    mp-compatibility: true
