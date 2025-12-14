@@ -57,27 +57,27 @@ public abstract class RedisCacheAdapter<T> implements CachePort<T> {
         log.debug("[{}] Attempting to get from cache with key: {}", entityName, cacheKey);
 
         return valueCommands.get(cacheKey)
-                .onItem().transformToUni(jsonValue -> {
-                    if (jsonValue == null) {
-                        log.debug("[{}] Cache miss for key: {}", entityName, cacheKey);
-                        return Uni.createFrom().nullItem();
-                    }
+            .onItem().transformToUni(jsonValue -> {
+                if (jsonValue == null) {
+                    log.debug("[{}] Cache miss for key: {}", entityName, cacheKey);
+                    return Uni.createFrom().nullItem();
+                }
 
-                    try {
-                        PagedResponse<T> result = deserialize(jsonValue);
-                        log.debug("[{}] Cache hit for key: {}", entityName, cacheKey);
-                        return Uni.createFrom().item(result);
-                    } catch (Exception e) {
-                        log.warn("[{}] Error deserializing cached value for key: {}. Error: {}", entityName, cacheKey, e.getMessage());
-                        // Si falla la deserialización, invalidar la clave corrupta
-                        return invalidate(cacheKey)
-                                .replaceWith(Uni.createFrom().nullItem());
-                    }
-                })
-                .onFailure().invoke(error ->
-                        log.warn("[{}] Error accessing cache for key: {}. Error: {}", entityName, cacheKey, error.getMessage())
-                )
-                .onFailure().recoverWithNull(); // Si Redis falla, continuar sin cache
+                try {
+                    PagedResponse<T> result = deserialize(jsonValue);
+                    log.debug("[{}] Cache hit for key: {}", entityName, cacheKey);
+                    return Uni.createFrom().item(result);
+                } catch (Exception e) {
+                    log.warn("[{}] Error deserializing cached value for key: {}. Error: {}", entityName, cacheKey, e.getMessage());
+                    // Si falla la deserialización, invalidar la clave corrupta
+                    return invalidate(cacheKey)
+                        .replaceWith(Uni.createFrom().nullItem());
+                }
+            })
+            .onFailure().invoke(error ->
+                log.warn("[{}] Error accessing cache for key: {}. Error: {}", entityName, cacheKey, error.getMessage())
+            )
+            .onFailure().recoverWithNull(); // Si Redis falla, continuar sin cache
     }
 
     @Override
@@ -88,14 +88,14 @@ public abstract class RedisCacheAdapter<T> implements CachePort<T> {
             String jsonValue = serialize(value);
 
             return valueCommands.setex(cacheKey, ttl.getSeconds(), jsonValue)
-                    .onItem().invoke(() ->
-                            log.debug("[{}] Successfully cached result for key: {}", entityName, cacheKey)
-                    )
-                    .onFailure().invoke(error ->
-                            log.warn("[{}] Error caching value for key: {}. Error: {}", entityName, cacheKey, error.getMessage())
-                    )
-                    .onFailure().recoverWithNull() // Si falla, continuar sin cache
-                    .replaceWithVoid();
+                .onItem().invoke(() ->
+                    log.debug("[{}] Successfully cached result for key: {}", entityName, cacheKey)
+                )
+                .onFailure().invoke(error ->
+                    log.warn("[{}] Error caching value for key: {}. Error: {}", entityName, cacheKey, error.getMessage())
+                )
+                .onFailure().recoverWithNull() // Si falla, continuar sin cache
+                .replaceWithVoid();
 
         } catch (Exception e) {
             log.warn("[{}] Error serializing value for cache key: {}. Error: {}", entityName, cacheKey, e.getMessage());
@@ -108,14 +108,14 @@ public abstract class RedisCacheAdapter<T> implements CachePort<T> {
         log.debug("[{}] Invalidating cache key: {}", entityName, cacheKey);
 
         return valueCommands.getdel(cacheKey)
-                .onItem().invoke(() ->
-                        log.debug("[{}] Successfully invalidated key: {}", entityName, cacheKey)
-                )
-                .onFailure().invoke(error ->
-                        log.warn("[{}] Error invalidating cache key: {}. Error: {}", entityName, cacheKey, error.getMessage())
-                )
-                .onFailure().recoverWithNull()
-                .replaceWithVoid();
+            .onItem().invoke(() ->
+                log.debug("[{}] Successfully invalidated key: {}", entityName, cacheKey)
+            )
+            .onFailure().invoke(error ->
+                log.warn("[{}] Error invalidating cache key: {}. Error: {}", entityName, cacheKey, error.getMessage())
+            )
+            .onFailure().recoverWithNull()
+            .replaceWithVoid();
     }
 
     /**
@@ -133,30 +133,30 @@ public abstract class RedisCacheAdapter<T> implements CachePort<T> {
 
         // Nota: En producción, considera usar SCAN en lugar de KEYS para mejor rendimiento
         return redisDataSource
-                .key()
-                .keys(pattern)
-                .onItem().transformToUni(keys -> {
-                    if (keys.isEmpty()) {
-                        log.debug("[{}] No cache keys found to invalidate", entityName);
-                        return Uni.createFrom().voidItem();
-                    }
+            .key()
+            .keys(pattern)
+            .onItem().transformToUni(keys -> {
+                if (keys.isEmpty()) {
+                    log.debug("[{}] No cache keys found to invalidate", entityName);
+                    return Uni.createFrom().voidItem();
+                }
 
-                    log.debug("[{}] Found {} cache keys to invalidate", entityName, keys.size());
+                log.debug("[{}] Found {} cache keys to invalidate", entityName, keys.size());
 
-                    // Eliminar todas las claves encontradas
-                    return redisDataSource
-                            .key()
-                            .del(keys.toArray(new String[0]))
-                            .onItem().invoke(deleted ->
-                                    log.info("[{}] Invalidated {} cache entries", entityName, deleted)
-                            )
-                            .replaceWithVoid();
-                })
-                .onFailure().invoke(error ->
-                        log.warn("[{}] Error invalidating all cache entries. Error: {}", entityName, error.getMessage())
-                )
-                .onFailure().recoverWithNull()
-                .replaceWithVoid();
+                // Eliminar todas las claves encontradas
+                return redisDataSource
+                    .key()
+                    .del(keys.toArray(new String[0]))
+                    .onItem().invoke(deleted ->
+                        log.info("[{}] Invalidated {} cache entries", entityName, deleted)
+                    )
+                    .replaceWithVoid();
+            })
+            .onFailure().invoke(error ->
+                log.warn("[{}] Error invalidating all cache entries. Error: {}", entityName, error.getMessage())
+            )
+            .onFailure().recoverWithNull()
+            .replaceWithVoid();
     }
 
     /**
