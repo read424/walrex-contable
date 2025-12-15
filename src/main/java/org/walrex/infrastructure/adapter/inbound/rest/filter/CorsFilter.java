@@ -68,7 +68,7 @@ public class CorsFilter {
         response.putHeader("Access-Control-Allow-Headers", allowedHeaders);
 
         exposedHeaders.ifPresent(headers ->
-                response.putHeader("Access-Control-Expose-Headers", headers)
+            response.putHeader("Access-Control-Expose-Headers", headers)
         );
 
         response.putHeader("Access-Control-Max-Age", maxAge);
