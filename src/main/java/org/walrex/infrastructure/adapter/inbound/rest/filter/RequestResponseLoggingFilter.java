@@ -69,7 +69,7 @@ public class RequestResponseLoggingFilter {
         String path = rc.request().path();
 
         log.info("🔵 INCOMING REQUEST [{}] {} {} - Path: {}",
-                requestId, method, uri, path);
+            requestId, method, uri, path);
 
         // Log query parameters
         if (!rc.request().params().isEmpty()) {
@@ -83,10 +83,10 @@ public class RequestResponseLoggingFilter {
 
         // Log headers importantes
         log.debug("  📧 Headers [{}]: Content-Type={}, Accept={}, User-Agent={}",
-                requestId,
-                rc.request().getHeader("Content-Type"),
-                rc.request().getHeader("Accept"),
-                rc.request().getHeader("User-Agent"));
+            requestId,
+            rc.request().getHeader("Content-Type"),
+            rc.request().getHeader("Accept"),
+            rc.request().getHeader("User-Agent"));
 
         // Log del body si existe
         if (rc.body() != null && rc.body().length() > 0) {
@@ -104,16 +104,16 @@ public class RequestResponseLoggingFilter {
         String statusMessage = getStatusEmoji(statusCode);
 
         log.info("{} RESPONSE [{}] Status: {} - Duration: {} ms",
-                statusMessage, requestId, statusCode, duration);
+            statusMessage, requestId, statusCode, duration);
 
         // Log response headers importantes
         log.debug("  📧 Response Headers [{}]: Content-Type={}",
-                requestId, rc.response().headers().get("Content-Type"));
+            requestId, rc.response().headers().get("Content-Type"));
 
         // Si hay error, intentar obtener el body
         if (statusCode >= 400) {
             log.error("  ❌ Error Response [{}] - Status: {} - Path: {} - Duration: {} ms",
-                    requestId, statusCode, rc.request().path(), duration);
+                requestId, statusCode, rc.request().path(), duration);
         }
     }
 
@@ -127,7 +127,7 @@ public class RequestResponseLoggingFilter {
 
     private String generateRequestId() {
         return String.format("%s-%d",
-                Instant.now().toEpochMilli(),
-                Thread.currentThread().getId());
+            Instant.now().toEpochMilli(),
+            Thread.currentThread().getId());
     }
 }

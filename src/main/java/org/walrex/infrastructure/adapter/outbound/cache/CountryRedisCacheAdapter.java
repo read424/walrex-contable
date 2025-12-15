@@ -28,10 +28,10 @@ public class CountryRedisCacheAdapter extends RedisCacheAdapter<CountryResponse>
     @Inject
     public CountryRedisCacheAdapter(ReactiveRedisDataSource reactiveRedisDataSource, ObjectMapper objectMapper) {
         super(
-                reactiveRedisDataSource,
-                objectMapper,
-                new TypeReference<PagedResponse<CountryResponse>>() {},
-                "Country"
+            reactiveRedisDataSource,
+            objectMapper,
+            new TypeReference<PagedResponse<CountryResponse>>() {},
+            "Country"
         );
     }
 

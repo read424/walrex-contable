@@ -31,6 +31,9 @@ public class CountryRouter {
     @Inject
     CountryHandler countryHandler;
 
+    @Inject
+    CountryCurrencyHandler countryCurrencyHandler;
+
     @Route(path = "", methods = Route.HttpMethod.POST)
     @Operation(
             summary = "Crear un nuevo pais",
@@ -373,6 +376,222 @@ public class CountryRouter {
     })
     public Uni<Void> checkAvailability(RoutingContext rc) {
         return countryHandler.checkAvailability(rc);
+    }
+
+    // ==================== Country-Currency Endpoints ====================
+
+    /**
+     * GET /api/v1/countries/{countryId}/currencies - List currencies of a country
+     */
+    @Route(path = "/:countryId/currencies", methods = Route.HttpMethod.GET)
+    @Operation(
+            summary = "Listar monedas de un país",
+            description = "Obtiene todas las monedas asignadas a un país específico"
+    )
+    @Parameter(
+            name = "countryId",
+            description = "ID del país",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Lista de monedas obtenida exitosamente",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "País no encontrado",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> listCurrencies(RoutingContext rc) {
+        return countryCurrencyHandler.listCurrencies(rc);
+    }
+
+    /**
+     * POST /api/v1/countries/{countryId}/currencies/{currencyId} - Assign currency to country
+     */
+    @Route(path = "/:countryId/currencies/:currencyId", methods = Route.HttpMethod.POST)
+    @Operation(
+            summary = "Asignar moneda a un país",
+            description = "Crea una relación entre un país y una moneda"
+    )
+    @Parameter(
+            name = "countryId",
+            description = "ID del país",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @Parameter(
+            name = "currencyId",
+            description = "ID de la moneda",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "201",
+                    description = "Moneda asignada exitosamente",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "400",
+                    description = "Datos inválidos",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "409",
+                    description = "La moneda ya está asignada al país",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> assignCurrency(RoutingContext rc) {
+        return countryCurrencyHandler.assignCurrency(rc);
+    }
+
+    /**
+     * PUT /api/v1/countries/{countryId}/currencies/{currencyId}/default - Set currency as default
+     */
+    @Route(path = "/:countryId/currencies/:currencyId/default", methods = Route.HttpMethod.PUT)
+    @Operation(
+            summary = "Establecer moneda predeterminada",
+            description = "Define una moneda como la predeterminada para un país"
+    )
+    @Parameter(
+            name = "countryId",
+            description = "ID del país",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @Parameter(
+            name = "currencyId",
+            description = "ID de la moneda",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Moneda establecida como predeterminada",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "400",
+                    description = "La moneda no está asignada al país",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "País o moneda no encontrado",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> setDefaultCurrency(RoutingContext rc) {
+        return countryCurrencyHandler.setDefaultCurrency(rc);
+    }
+
+    /**
+     * PUT /api/v1/countries/{countryId}/currencies/{currencyId}/operation - Update operational status
+     */
+    @Route(path = "/:countryId/currencies/:currencyId/operation", methods = Route.HttpMethod.PUT)
+    @Operation(
+            summary = "Actualizar estado operacional de moneda",
+            description = "Activa o desactiva la operación con una moneda en un país"
+    )
+    @Parameter(
+            name = "countryId",
+            description = "ID del país",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @Parameter(
+            name = "currencyId",
+            description = "ID de la moneda",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @RequestBody(
+            description = "Estado operacional",
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Activar moneda",
+                            value = """
+                            {
+                                "isOperational": true
+                            }
+                            """
+                    )
+            )
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Estado operacional actualizado",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "400",
+                    description = "Datos inválidos",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "Relación país-moneda no encontrada",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> updateOperationalStatus(RoutingContext rc) {
+        return countryCurrencyHandler.updateOperationalStatus(rc);
+    }
+
+    /**
+     * GET /api/v1/countries/{countryId}/default-currency - Get default currency
+     */
+    @Route(path = "/:countryId/default-currency", methods = Route.HttpMethod.GET)
+    @Operation(
+            summary = "Obtener moneda predeterminada",
+            description = "Recupera la moneda predeterminada de un país"
+    )
+    @Parameter(
+            name = "countryId",
+            description = "ID del país",
+            required = true,
+            in = ParameterIn.PATH,
+            schema = @Schema(type = SchemaType.INTEGER),
+            example = "1"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Moneda predeterminada obtenida",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "País no tiene moneda predeterminada",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> getDefaultCurrency(RoutingContext rc) {
+        return countryCurrencyHandler.getDefaultCurrency(rc);
     }
 
 }
