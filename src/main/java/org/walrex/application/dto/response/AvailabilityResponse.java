@@ -1,8 +1,5 @@
 package org.walrex.application.dto.response;
 
-/**
- * Response DTO for field availability checks.
- */
 public record AvailabilityResponse(
         /**
          * El campo que se verificó.
@@ -23,6 +20,7 @@ public record AvailabilityResponse(
          * Mensaje descriptivo para mostrar al usuario.
          */
         String message
+
 ) {
     /**
      * Factory method genérico que decide si es available o unavailable.

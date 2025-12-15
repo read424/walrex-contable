@@ -3,20 +3,21 @@ package org.walrex.application.dto.response;
 import java.time.OffsetDateTime;
 
 /**
- * Response DTO for System Document Type.
- * This record is immutable and excludes the deletedAt field.
+ * DTO de respuesta para un tipo de documento del sistema.
+ *
+ * Nota: Usamos record (inmutable) para DTOs.
+ * No exponemos deletedAt al exterior por seguridad.
  */
 public record SystemDocumentTypeResponse(
-    Integer id,
-    String code,
-    String name,
-    String description,
-    Boolean isRequired,
-    Boolean forPerson,
-    Boolean forCompany,
-    Integer priority,
-    Boolean active,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
-) {
+        Long id,
+        String code,
+        String name,
+        String description,
+        Boolean isRequired,
+        Boolean forPerson,
+        Boolean forCompany,
+        Integer priority,
+        Boolean active,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {
 }

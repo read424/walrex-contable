@@ -1,6 +1,10 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.mapper;
 
-import org.mapstruct.*;
+import org.mapstruct.InjectionStrategy;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+import org.mapstruct.ReportingPolicy;
 import org.walrex.domain.model.SystemDocumentType;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.SystemDocumentTypeEntity;
 

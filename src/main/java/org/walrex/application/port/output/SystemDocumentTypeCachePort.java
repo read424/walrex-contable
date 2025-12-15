@@ -7,7 +7,7 @@ import org.walrex.application.dto.response.SystemDocumentTypeResponse;
 import java.time.Duration;
 
 /**
- * Output port for System Document Type caching operations.
+ * Puerto de salida para operaciones de caché de tipos de documento.
  */
 public interface SystemDocumentTypeCachePort {
     Uni<PagedResponse<SystemDocumentTypeResponse>> get(String key);

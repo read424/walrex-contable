@@ -3,8 +3,6 @@ package org.walrex.infrastructure.adapter.outbound.cache;
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.query.SystemDocumentTypeFilter;
 
-import java.util.StringJoiner;
-
 /**
  * Generador de claves de cache para SystemDocumentType.
  *

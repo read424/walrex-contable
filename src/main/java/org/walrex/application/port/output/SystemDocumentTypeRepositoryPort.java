@@ -4,7 +4,8 @@ import io.smallrye.mutiny.Uni;
 import org.walrex.domain.model.SystemDocumentType;
 
 /**
- * Output port for System Document Type write operations.
+ * Puerto de salida para operaciones de escritura en el repositorio de tipos de
+ * documento.
  */
 public interface SystemDocumentTypeRepositoryPort {
     Uni<SystemDocumentType> save(SystemDocumentType systemDocumentType);

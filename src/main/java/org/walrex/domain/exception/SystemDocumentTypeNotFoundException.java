@@ -1,7 +1,7 @@
 package org.walrex.domain.exception;
 
 /**
- * Exception thrown when a requested System Document Type is not found.
+ * Excepción lanzada cuando no se encuentra un tipo de documento del sistema.
  */
 public class SystemDocumentTypeNotFoundException extends RuntimeException {
 

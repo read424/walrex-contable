@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Output port for System Document Type read/query operations.
+ * Puerto de salida para operaciones de consulta en el repositorio de tipos de
+ * documento.
  */
 public interface SystemDocumentTypeQueryPort {
 

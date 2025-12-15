@@ -1,8 +1,7 @@
 package org.walrex.domain.exception;
 
 /**
- * Exception thrown when attempting to create or update a System Document Type
- * with a code or name that already exists.
+ * Excepción lanzada cuando se intenta crear un tipo de documento duplicado.
  */
 public class DuplicateSystemDocumentTypeException extends RuntimeException {
 

@@ -9,12 +9,16 @@ import org.walrex.domain.model.SystemDocumentType;
 
 import java.util.List;
 
+/**
+ * Mapper para convertir modelo de dominio a DTOs de respuesta.
+ */
 @Mapper(
         componentModel = MappingConstants.ComponentModel.CDI,
         unmappedTargetPolicy =  ReportingPolicy.IGNORE,
         injectionStrategy = InjectionStrategy.CONSTRUCTOR
 )
 public interface SystemDocumentTypeDtoMapper {
+
     /**
      * Convierte modelo de dominio a SystemDocumentTypeResponse.
      */

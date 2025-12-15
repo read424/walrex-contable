@@ -5,6 +5,9 @@ import org.walrex.application.dto.request.CreateSystemDocumentTypeRequest;
 import org.walrex.application.dto.request.UpdateSystemDocumentTypeRequest;
 import org.walrex.domain.model.SystemDocumentType;
 
+/**
+ * Mapper para convertir DTOs de request a modelo de dominio.
+ */
 @Mapper(
         componentModel = MappingConstants.ComponentModel.CDI,
         unmappedTargetPolicy =  ReportingPolicy.IGNORE,

@@ -1,20 +1,17 @@
 package org.walrex.infrastructure.adapter.outbound.persistence;
 
-import io.quarkus.panache.common.Sort;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.query.SystemDocumentTypeFilter;
-import org.walrex.application.dto.response.PagedResponse;
 import org.walrex.application.port.output.SystemDocumentTypeQueryPort;
 import org.walrex.application.port.output.SystemDocumentTypeRepositoryPort;
 import org.walrex.domain.model.PagedResult;
 import org.walrex.domain.model.SystemDocumentType;
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.SystemDocumentTypeMapper;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.SystemDocumentTypeRepository;
-
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -91,7 +88,7 @@ public class SystemDocumentTypePersistenceAdapter
                     entity.setUpdatedAt(OffsetDateTime.now());
                     return systemDocumentTypeRepository.persist(entity)
                             .call(() -> systemDocumentTypeRepository.flush()) // Forzar flush para asegurar que se
-                            // escribió en DB
+                                                                              // escribió en DB
                             .onItem().transform(e -> true);
                 });
     }
@@ -113,7 +110,7 @@ public class SystemDocumentTypePersistenceAdapter
                     entity.setUpdatedAt(OffsetDateTime.now());
                     return systemDocumentTypeRepository.persist(entity)
                             .call(() -> systemDocumentTypeRepository.flush()) // Forzar flush para asegurar que se
-                            // escribió en DB
+                                                                              // escribió en DB
                             .onItem().transform(e -> true);
                 });
     }
@@ -162,7 +159,7 @@ public class SystemDocumentTypePersistenceAdapter
     // ====================
 
     @Override
-    public Uni<PagedResult<SystemDocumentType>> findAll(org.walrex.application.dto.query.PageRequest pageRequest, SystemDocumentTypeFilter filter) {
+    public Uni<PagedResult<SystemDocumentType>> findAll(PageRequest pageRequest, SystemDocumentTypeFilter filter) {
         // Ejecutar ambas queries en paralelo para mejor performance
         Uni<List<SystemDocumentType>> dataUni = systemDocumentTypeRepository.findWithFilters(pageRequest, filter)
                 .onItem().transform(systemDocumentTypeMapper::toDomain)

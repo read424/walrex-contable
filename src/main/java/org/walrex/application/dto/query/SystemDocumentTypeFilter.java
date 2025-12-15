@@ -1,18 +1,15 @@
 package org.walrex.application.dto.query;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
- * Filter DTO for querying System Document Types.
- * All fields are optional and can be combined for advanced filtering.
+ * Filtros para búsqueda de tipos de documento del sistema.
+ *
+ * Usa el patrón Builder para construcción flexible.
  */
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class SystemDocumentTypeFilter {
 
     /**
