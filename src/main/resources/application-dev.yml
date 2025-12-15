@@ -142,6 +142,10 @@ quarkus:
 
   opentelemetry:
     enabled: true
+    logs:
+      exporter: otlp
+    log:
+      service-name: admon-catalogo
     tracer:
       auto-config:
         instrumentation:

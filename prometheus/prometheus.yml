@@ -1,0 +1,78 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'admon-catalogo'
+    environment: 'dev'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: []
+
+scrape_configs:
+  # ==========================================
+  # APPLICATION METRICS (Quarkus)
+  # ==========================================
+  - job_name: 'quarkus-app'
+    metrics_path: '/q/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['localhost:8088']
+        labels:
+          service: 'admon-catalogo'
+          component: 'backend'
+          technology: 'quarkus'
+    # Métricas importantes de Quarkus:
+    # - http_server_requests_seconds_* (latencia, throughput)
+    # - jvm_threads_* (uso de threads)
+    # - vertx_eventloop_* (event loop metrics)
+    # - http_server_active_requests (requests activos)
+
+  # ==========================================
+  # POSTGRESQL METRICS
+  # ==========================================
+  - job_name: 'postgresql'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          component: 'database'
+          technology: 'postgresql'
+    # Métricas importantes:
+    # - pg_stat_database_* (conexiones, transacciones)
+    # - pg_stat_bgwriter_* (cache hit ratio)
+    # - pg_locks_* (locks y deadlocks)
+    # - pg_stat_activity_* (slow queries)
+    # - pg_replication_* (replication lag)
+
+  # ==========================================
+  # REDIS METRICS
+  # ==========================================
+  - job_name: 'redis'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          component: 'cache'
+          technology: 'redis'
+    # Métricas importantes:
+    # - redis_memory_* (uso de memoria)
+    # - redis_commands_* (operaciones por segundo)
+    # - redis_keyspace_* (keys, evictions)
+    # - redis_net_* (I/O network)
+    # - redis_slowlog_* (slow commands)
+
+  # ==========================================
+  # PROMETHEUS SELF-MONITORING
+  # ==========================================
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
