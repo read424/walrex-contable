@@ -23,7 +23,10 @@ public class CountryCurrencyRepository implements PanacheRepositoryBase<CountryC
      * Encuentra la moneda predeterminada de un país.
      */
     public Uni<CountryCurrencyEntity> findPrimaryByCountryId(Integer countryId) {
-        return find("country.id = ?1 and isPrimary = true", countryId)
+        return find("select cc from CountryCurrencyEntity cc " +
+                        "join fetch cc.currency " +
+                        "join fetch cc.country " +
+                        "where cc.country.id = ?1 and cc.isPrimary = true", countryId)
                 .firstResult();
     }
 
@@ -31,7 +34,10 @@ public class CountryCurrencyRepository implements PanacheRepositoryBase<CountryC
      * Encuentra una relación específica país-moneda.
      */
     public Uni<CountryCurrencyEntity> findByCountryIdAndCurrencyId(Integer countryId, Integer currencyId) {
-        return find("country.id = ?1 and currency.id = ?2", countryId, currencyId)
+        return find("select cc from CountryCurrencyEntity cc " +
+                        "join fetch cc.currency " +
+                        "join fetch cc.country " +
+                        "where cc.country.id = ?1 and cc.currency.id = ?2", countryId, currencyId)
                 .firstResult();
     }
 
@@ -64,6 +70,7 @@ public class CountryCurrencyRepository implements PanacheRepositoryBase<CountryC
     public Uni<List<CountryCurrencyEntity>> findByCountryIdWithCurrency(Integer countryId) {
         return find("select cc from CountryCurrencyEntity cc " +
                         "join fetch cc.currency " +
+                        "join fetch cc.country " +
                         "where cc.country.id = ?1 " +
                         "order by cc.isPrimary desc, cc.currency.alphabeticCode asc", countryId)
                 .list();
