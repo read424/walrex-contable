@@ -1,7 +1,6 @@
 package org.walrex.domain.exception;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 /**
  * Excepción lanzada cuando se intenta crear/actualizar una moneda
