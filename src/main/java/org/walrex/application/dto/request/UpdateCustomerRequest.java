@@ -5,9 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-public record CreateCustomerRequest(
-        Long id,
-
+public record UpdateCustomerRequest(
         @NotNull(message = "El tipo de documento es obligatorio")
         Integer idTypeDocument,
 
@@ -43,8 +41,8 @@ public record CreateCustomerRequest(
         @Pattern(regexp = "^[0-9]{8,12}$", message = "El número de teléfono debe contener exactamente 8 a 12 dígitos")
         String phoneNumber,
 
-        @NotNull(message = "El número de teléfono móvil es obligatorio")
-        @Pattern(regexp = "^[0-9]{8,12}$", message = "El número de teléfono debe contener exactamente 8 a 12 dígitos")
+        @NotNull(message = "El número de teléfono movil es obligatorio")
+        @Pattern(regexp = "^[0-9]{8,12}$", message = "El número de teléfono movil debe contener exactamente 8 a 12 dígitos")
         String phoneMobile
 ) {
 }
