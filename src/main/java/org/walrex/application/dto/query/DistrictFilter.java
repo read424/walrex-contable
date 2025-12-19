@@ -9,7 +9,7 @@ public class DistrictFilter {
     /**
      * Filtro exacto por id Provincia (ej: 1).
      */
-    private Integer idProvice;
+    private Integer idProvince;
 
     /**
      * Filtro exacto por codigo (ej: 010101).
