@@ -4,7 +4,7 @@ import io.smallrye.mutiny.Uni;
 
 import java.util.Map;
 
-public interface UbigeoCatalogPort {
+public interface UbigeoCatalogQueryPort {
     Uni<Map<String, Long>> departamentosExistentes(); // code -> id
     Uni<Map<String, Long>> provinciasExistentes();     // code -> id
     Uni<Map<String, Long>> distritosExistentes();      // ubigeo -> id

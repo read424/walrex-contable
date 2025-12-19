@@ -1,4 +1,10 @@
 package org.walrex.application.dto.response;
 
-public record UbigeoPreviewResponse() {
+import java.util.List;
+
+public record UbigeoPreviewResponse(
+    List<DepartamentoPreview> departamento,
+    List<ProvinciaPreview> provincia,
+    List<DistritoPreview> distrito
+) {
 }

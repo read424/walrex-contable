@@ -1,4 +1,14 @@
 package org.walrex.application.dto.response;
 
-public record DistritoPreview() {
+import lombok.Builder;
+import lombok.Data;
+
+@Builder
+@Data
+public class DistritoPreview {
+    private Long id;
+    private String code;
+    private String nombre;
+    private String ubigeo;
+    private String status;
 }
