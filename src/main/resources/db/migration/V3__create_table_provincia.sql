@@ -10,10 +10,10 @@ CREATE TABLE province (
 
     CONSTRAINT fk_provincia_departamento
        FOREIGN KEY (id_departament)
-           REFERENCES departamento (id_departament)
+           REFERENCES departament (id_departament)
            ON UPDATE CASCADE
            ON DELETE RESTRICT,
 
-    CONSTRAINT province_code_uk UNIQUE (code_province),
+    CONSTRAINT province_code_uk UNIQUE (cod_province),
     CONSTRAINT province_name_uk UNIQUE (name_province)
 );
