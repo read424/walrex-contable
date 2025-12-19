@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>http://localhost:3100/loki/api/v1/push</url>
+        </http>
+        <format>
+            <label>
+                <pattern>app=admon-catalogo,host=${HOSTNAME},level=%level</pattern>
+            </label>
+            <message>
+                <pattern>
+                    {
+                      "timestamp": "%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z', UTC}",
+                      "level": "%level",
+                      "logger": "%logger{36}",
+                      "thread": "%thread",
+                      "message": "%msg",
+                      "traceId": "%X{traceId:-}",
+                      "spanId": "%X{spanId:-}",
+                      "exception": "%ex{full}"
+                    }
+                </pattern>
+            </message>
+            <sortByTime>true</sortByTime>
+        </format>
+        <batchSize>100</batchSize>
+        <batchTimeoutMs>10000</batchTimeoutMs>
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="io.quarkus.logging.json.JsonFormatter">
+                <JsonFormat>TIMESTAMP,LEVEL,LOGGER_NAME,THREAD_NAME,THREAD_ID,MDC,MESSAGE,EXCEPTION</JsonFormat>
+            </layout>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="LOKI" />
+    </root>
+
+    <!-- Configuraciones de nivel de log específicas -->
+    <logger name="io.vertx.pgclient" level="DEBUG" />
+    <logger name="org.hibernate.SQL" level="DEBUG" />
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" />
+    <logger name="org.hibernate.type.descriptor.sql.BasicExtractor" level="TRACE" />
+    <logger name="org.walrex" level="DEBUG" />
+    <logger name="org.hibernate.reactive" level="DEBUG" />
+    <logger name="io.vertx.sqlclient.impl" level="DEBUG" />
+    <logger name="io.quarkus.http.access-log" level="DEBUG" />
+    <logger name="org.walrex.infrastructure.adapter.inbound.mapper" level="TRACE" />
+    <logger name="org.walrex.infrastructure.adapter.outbound.persistence.mapper" level="TRACE" />
+</configuration>
