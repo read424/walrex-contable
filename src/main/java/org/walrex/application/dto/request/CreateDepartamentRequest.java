@@ -8,8 +8,8 @@ import org.hibernate.validator.constraints.Length;
 public record CreateDepartamentRequest(
         @NotNull(message = "Es obligatorio el atributo codigo del departamento")
         @NotEmpty(message = "Codigo no puede estar vacio")
-        @Length(min = 6, max = 6, message = "Codigo debe contener 6 caracteres")
-        @Pattern(regexp = "^[0-9]{6}$", message = "Codigo solo debe contener carácteres numéricos")
+        @Length(min = 2, max = 2, message = "Codigo debe contener 2 caracteres")
+        @Pattern(regexp = "^[0-9]{2}$", message = "Codigo solo debe contener carácteres numéricos")
         String code,
 
         @NotNull(message = "Es obligatorio el atributo nombre del departamento")
