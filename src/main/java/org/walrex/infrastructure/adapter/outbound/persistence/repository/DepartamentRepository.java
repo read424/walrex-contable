@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.Map;
 
 @ApplicationScoped
-public class DepartamentRepository  implements PanacheRepositoryBase<DepartamentEntity, Integer> {
+public class DepartamentRepository implements PanacheRepositoryBase<DepartamentEntity, Integer> {
 
     /**
      * Buscar departamento por id (activos solamente).
      */
-    public Uni<DepartamentEntity> findActiveById(Integer id){
+    public Uni<DepartamentEntity> findActiveById(Integer id) {
         return find("id = ?1 and status=true", id).firstResult();
     }
 
@@ -52,7 +52,7 @@ public class DepartamentRepository  implements PanacheRepositoryBase<Departament
      * Busca departamento por nombre exacto (activas solamente).
      */
     public Uni<DepartamentEntity> findByName(String name) {
-        return find("lower(name) = ?1 and status=true", name.toLowerCase().trim())
+        return find("lower(nombre) = ?1 and status=true", name.toLowerCase().trim())
                 .firstResult();
     }
 
@@ -67,7 +67,7 @@ public class DepartamentRepository  implements PanacheRepositoryBase<Departament
             return count("codigo = ?1 and status=true", code.toUpperCase())
                     .map(count -> count > 0);
         }
-        return count("alphabeticCode3 = ?1 and status=true and id != ?2",
+        return count("codigo = ?1 and status=true and id != ?2",
                 code.toUpperCase(), excludeId)
                 .map(count -> count > 0);
     }
@@ -102,7 +102,7 @@ public class DepartamentRepository  implements PanacheRepositoryBase<Departament
         StringBuilder query = new StringBuilder("1=1");
         Map<String, Object> params = new HashMap<>();
 
-        // Aplicar filtros del objeto CurrencyFilter
+        // Aplicar filtros del objeto DepartamentFilter
         applyFilters(query, params, filter);
 
         // Ordenamiento
@@ -178,16 +178,17 @@ public class DepartamentRepository  implements PanacheRepositoryBase<Departament
             return;
         }
 
-        // Búsqueda general (en nombre o código alfabético)
+        // Búsqueda general (en nombre o código)
+        // search string para name y code string para codigo
         if (filter.getName() != null && !filter.getName().isBlank()) {
-            query.append(" and (lower(nombre) like :search");
+            query.append(" and lower(nombre) like :search");
             params.put("search", "%" + filter.getName().toLowerCase().trim() + "%");
         }
 
-        // Filtro exacto por código alfabético
+        // Filtro exacto por código
         if (filter.getCodigo() != null && !filter.getCodigo().isBlank()) {
-            query.append(" and codigo = :alphabeticCode");
-            params.put("alphabeticCode", filter.getCodigo());
+            query.append(" and codigo = :codigo");
+            params.put("codigo", filter.getCodigo());
         }
 
         // Filtro por estado (activo/inactivo)
