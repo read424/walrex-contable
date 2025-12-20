@@ -8,83 +8,11 @@ quarkus:
       enabled: true
       pattern: "%{REMOTE_IP} %l %u %t \"%r\" %s %b \"%{i,Referer}\" \"%{i,User-Agent}\" [%D ms]"
       log-to-file: false
-  log:
-    level: INFO
-    min-level: TRACE
-    category:
-      # SQL Queries con parámetros (muy importante para debugging)
-      "io.vertx.pgclient":
-        level: DEBUG
-      "org.hibernate.SQL":
-        level: DEBUG
-      "org.hibernate.type.descriptor.sql.BasicBinder":
-        level: TRACE
-      "org.hibernate.type.descriptor.sql.BasicExtractor":
-        level: TRACE
-      # Logging de nuestras clases
-      "org.walrex":
-        level: DEBUG
-      # Hibernate Reactive
-      "org.hibernate.reactive":
-        level: DEBUG
-      # Pool de conexiones
-      "io.vertx.sqlclient.impl":
-        level: DEBUG
-      # HTTP Requests/Responses
-      "io.quarkus.http.access-log":
-        level: DEBUG
-      # Mappers (MapStruct)
-      "org.walrex.infrastructure.adapter.inbound.mapper":
-        level: TRACE
-      "org.walrex.infrastructure.adapter.outbound.persistence.mapper":
-        level: TRACE
-    json:
-      enabled: true
-      fields:
-        timestamp:
-          enabled: true
-        level:
-          enabled: true
-        logger-name:
-          enabled: true
-        thread-name:
-          enabled: true
-        thread-id:
-          enabled: true
-        mdc:
-          enabled: true
-        ndc:
-          enabled: true
-        host-name:
-          enabled: true
-        process-id:
-          enabled: true
-        process-name:
-          enabled: true
-        exception:
-          enabled: true
-          include-cause: true
-          include-stack-trace: true
-    console:
-      format: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p [%c{3.}] (%t) %s%e%n"
-      enable-color: true
   # Deshabilitar Dev Services globalmente y para todas las extensiones
   devservices:
     enabled: false
   test:
     integration-test-profile: test
-  # Deshabilitar específicamente para PostgreSQL con todas las variantes
-  datasource:
-    devservices:
-      enabled: false
-    dev-services:
-      enabled: false
-    db-kind: postgresql
-    username: postgres
-    password: 12345
-    reactive:
-      url: postgresql://127.0.0.1:5432/walrex_db
-      max-size: 20
   hibernate-orm:
     log:
       sql: true
@@ -108,55 +36,5 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
-  micrometer:
-    enabled: true
-    registry-enabled-default: false
-    registry:
-      prometheus:
-        enabled: true
-    export:
-      prometheus:
-        path: /q/metrics
-    binder:
-      # JVM Metrics
-      jvm: true
-      # System Metrics
-      system: true
-      # HTTP Server Metrics
-      http-server:
-        enabled: true
-        max-uri-tags: 100
-      # HTTP Client Metrics
-      http-client:
-        enabled: true
-      # Vert.x Metrics (Event Loop)
-      vertx:
-        enabled: true
-      # Database Connection Pool Metrics
-      jdbc:
-        enabled: false  # Using reactive, not JDBC
-      # MP Metrics (MicroProfile)
-      mp-metrics:
-        enabled: true
-    binder-enabled-default: true
-
-  opentelemetry:
-    enabled: true
-    logs:
-      exporter: otlp
-    log:
-      service-name: admon-catalogo
-    tracer:
-      auto-config:
-        instrumentation:
-          http-server: true
-          http-client: true
-          jdbc: true
-      exporter:
-        otlp:
-          endpoint: http://localhost:4317  # Changed from tempo:4317 for host-based Quarkus
-      sampler: parentbased_always_on
-
   # SmallRye Fault Tolerance Metrics
   smallrye-fault-tolerance:
-    mp-compatibility: true

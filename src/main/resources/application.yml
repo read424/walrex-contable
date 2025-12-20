@@ -2,29 +2,32 @@ quarkus:
   application:
     name: admon-catalogo
   http:
+    body:
+      uploads-directory: tmp/uploads
+      merge-form-attributes: true
+    limits:
+      max-body-size: 10M
     port: 8089
     non-application-root-path: /q
     # Configuración de CORS
-    cors:
-      ~: true  # Habilitar CORS para todas las rutas
-      origins: "*"  # Permitir todos los orígenes (puedes especificar URLs específicas)
+    #cors:
+      #  ~: true  # Habilitar CORS para todas las rutas
+      #origins: "*"  # Permitir todos los orígenes (puedes especificar URLs específicas)
       # Para producción, reemplaza "*" con tus dominios específicos:
       # origins: "http://localhost:3000,https://tu-dominio.com,https://app.tu-dominio.com"
-      methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      headers: "accept,authorization,content-type,x-requested-with"
-      exposed-headers: "Content-Disposition"
-      access-control-max-age: 24H
-      access-control-allow-credentials: false  # Cambiar a true si usas cookies/autenticación
+      #methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      #headers: "accept,authorization,content-type,x-requested-with"
+      #exposed-headers: "Content-Disposition"
+      #access-control-max-age: 24H
+    #access-control-allow-credentials: false  # Cambiar a true si usas cookies/autenticación
   # Deshabilitar Dev Services globalmente y para todas las extensiones
   devservices:
     enabled: false
   test:
     integration-test-profile: test
-  # Deshabilitar específicamente para PostgreSQL con todas las variantes
+  # Datasource REACTIVE para la aplicación
   datasource:
     devservices:
-      enabled: false
-    dev-services:
       enabled: false
     db-kind: postgresql
     username: postgres
@@ -47,12 +50,31 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
+  # OpenTelemetry - Distributed Tracing
+  otel:
+    enabled: true
+    sdk:
+      disabled: false
+    service:
+      name: admon-catalogo
+    traces:
+      sampler:
+        arg: 1.0  # Capturar el 100% de las trazas (en dev)
+    exporter:
+      otlp:
+        endpoint: http://localhost:4317
+    propagators:
+      - tracecontext
+      - baggage
+    resource:
+      attributes:
+        service.name: admon-catalogo
+        service.version: 1.0.0-SNAPSHOT
+        deployment.environment: dev
+
   micrometer:
     enabled: true
     registry-enabled-default: false
-    registry:
-      prometheus:
-        enabled: true
     export:
       prometheus:
         path: /q/metrics
@@ -71,22 +93,14 @@ quarkus:
       # Vert.x Metrics (Event Loop)
       vertx:
         enabled: true
-      # Database Connection Pool Metrics
-      jdbc:
-        enabled: false  # Using reactive, not JDBC
       # MP Metrics (MicroProfile)
       mp-metrics:
         enabled: true
     binder-enabled-default: true
-
-  opentelemetry:
-    enabled: true
-    tracer:
-      exporter:
-        otlp:
-          endpoint: http://localhost:4317  # Changed from tempo:4317 for host-based Quarkus
-      sampler: parentbased_always_on
+  # Logging configuration moved to logback.xml
+  log:
+    level: INFO
+    min-level: TRACE
 
   # SmallRye Fault Tolerance Metrics
   smallrye-fault-tolerance:
-    mp-compatibility: true

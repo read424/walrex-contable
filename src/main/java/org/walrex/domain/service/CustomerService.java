@@ -1,5 +1,6 @@
 package org.walrex.domain.service;
 
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +20,7 @@ import org.walrex.application.port.output.CustomerQueryPort;
 import org.walrex.application.port.output.CustomerRepositoryPort;
 import org.walrex.domain.model.Customer;
 import org.walrex.infrastructure.adapter.inbound.mapper.CustomerDtoMapper;
+import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
 import org.walrex.infrastructure.adapter.outbound.cache.CustomerCacheKeyGenerator;
 import org.walrex.infrastructure.adapter.outbound.cache.qualifier.CustomerCache;
 
@@ -64,6 +66,8 @@ public class CustomerService implements
          * @return Uni con el cliente creado
          */
         @Override
+        @WithSpan("CustomerService.create")
+        @LogExecutionTime(value = LogExecutionTime.LogLevel.INFO, logParameters = true, logReturn = true)
         public Uni<Customer> agregar(Customer customer) {
                 log.info("Creating customer: {} {} ({})",
                                 customer.getFirstName(),
@@ -95,6 +99,8 @@ public class CustomerService implements
          * @return Uni con el cliente actualizado
          */
         @Override
+        @WithSpan("CustomerService.update")
+        @LogExecutionTime(value = LogExecutionTime.LogLevel.INFO, logParameters = true, logReturn = true)
         public Uni<Customer> actualizar(Integer id, Customer customer) {
                 log.info("Updating customer id: {}", id);
 
@@ -132,6 +138,8 @@ public class CustomerService implements
          * @return Uni con respuesta paginada
          */
         @Override
+        @WithSpan("CustomerService.list")
+        @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = true, logReturn = false)
         public Uni<PagedResponse<CustomerResponse>> listar(PageRequest pageRequest, CustomerFilter filter) {
                 log.info("Listing customers with page: {}, size: {}, filter: {}",
                                 pageRequest.getPage(), pageRequest.getSize(), filter);
