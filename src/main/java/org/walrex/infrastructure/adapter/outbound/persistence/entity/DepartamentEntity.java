@@ -23,7 +23,7 @@ public class DepartamentEntity extends PanacheEntityBase {
     @Column(name = "id_departament")
     private Integer id;
 
-    @Column(name = "cod_departament", nullable = false, unique = true)
+    @Column(name = "cod_departament", nullable = false, unique = true, columnDefinition = "CHAR(2)")
     private String codigo;
 
     @Column(name = "name_departament", nullable = false, unique = true)

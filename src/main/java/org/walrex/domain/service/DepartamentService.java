@@ -26,7 +26,7 @@ public class DepartamentService implements
         UpdateDepartamentUseCase,
         DeleteDepartamentUseCase,
         GetDepartmentRegionalUseCase,
-        ListDepartmentReginalUseCase {
+        ListDepartmentRegionalUseCase  {
 
     @Inject
     DepartamentRepositoryPort repositoryPort;

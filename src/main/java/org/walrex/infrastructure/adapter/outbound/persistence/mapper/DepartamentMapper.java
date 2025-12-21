@@ -10,7 +10,11 @@ import org.walrex.infrastructure.adapter.outbound.persistence.entity.Departament
 
 import java.util.List;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.CDI, unmappedTargetPolicy = ReportingPolicy.IGNORE, injectionStrategy = InjectionStrategy.CONSTRUCTOR)
+@Mapper(
+        componentModel = MappingConstants.ComponentModel.CDI
+        , unmappedTargetPolicy = ReportingPolicy.IGNORE
+        , injectionStrategy = InjectionStrategy.CONSTRUCTOR
+)
 public interface DepartamentMapper {
 
     @Mapping(source = "code", target = "codigo")
