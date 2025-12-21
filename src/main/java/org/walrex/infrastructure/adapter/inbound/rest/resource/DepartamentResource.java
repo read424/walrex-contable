@@ -52,7 +52,7 @@ public class DepartamentResource {
     GetDepartmentRegionalUseCase getUC;
 
     @Inject
-    ListDepartmentReginalUseCase listUC;
+    ListDepartmentRegionalUseCase listUC;
 
     @Inject
     DepartamentRequestMapper requestMapper;
