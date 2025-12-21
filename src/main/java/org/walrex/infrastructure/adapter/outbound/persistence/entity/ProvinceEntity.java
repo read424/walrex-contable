@@ -27,7 +27,7 @@ public class ProvinceEntity extends PanacheEntityBase {
     @JoinColumn(name = "id_departament", nullable = false, referencedColumnName = "id_departament")
     private DepartamentEntity departament;
 
-    @Column(name = "cod_province", nullable = false, unique = true)
+    @Column(name = "cod_province", nullable = false, unique = true, columnDefinition = "CHAR(4)")
     private String codigo;
 
     @Column(name = "name_province", nullable = false, unique = true)
