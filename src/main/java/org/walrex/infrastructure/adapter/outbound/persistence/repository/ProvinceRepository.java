@@ -6,6 +6,7 @@ import io.quarkus.panache.common.Sort;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.query.ProvinceFilter;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.DistrictEntity;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @ApplicationScoped
 public class ProvinceRepository  implements PanacheRepositoryBase<ProvinceEntity, Integer> {
 
@@ -60,9 +62,10 @@ public class ProvinceRepository  implements PanacheRepositoryBase<ProvinceEntity
     /**
      * Busca provincia por id departamento (activas solamente).
      */
-    public Uni<ProvinceEntity> findByidDepartamento(Integer idDepartamento) {
-        return find("departament.id = ?1 and status=true", idDepartamento)
-                .firstResult();
+    public Multi<ProvinceEntity> findByIdDepartamento(Integer idDepartamento) {
+        return list("departament.id = ?1 and status=true", idDepartamento)
+                .onItem()
+                .transformToMulti(list -> Multi.createFrom().iterable(list));
     }
 
     // ==================== Verificaciones de Unicidad ====================
@@ -82,16 +85,17 @@ public class ProvinceRepository  implements PanacheRepositoryBase<ProvinceEntity
     }
 
     /**
-     * Verifica si existe un provincia con el nombre.
+     * Verifica si existe una provincia con el nombre en un departamento específico.
      */
-    public Uni<Boolean> existsByName(String name, Integer excludeId) {
+    public Uni<Boolean> existsByNameForDepartment(String name, Integer idDepartment, Integer excludeId) {
         String normalizedName = name.toLowerCase().trim();
         if (excludeId == null) {
-            return count("lower(name) = ?1 and status=true", normalizedName)
+            return count("lower(name) = ?1 and departament.id = ?2 and status=true",
+                    normalizedName, idDepartment)
                     .map(count -> count > 0);
         }
-        return count("lower(name) = ?1 and status=true and id != ?2",
-                normalizedName, excludeId)
+        return count("lower(name) = ?1 and departament.id = ?2 and status=true and id != ?3",
+                normalizedName, idDepartment, excludeId)
                 .map(count -> count > 0);
     }
 
@@ -193,9 +197,9 @@ public class ProvinceRepository  implements PanacheRepositoryBase<ProvinceEntity
             params.put("idDepartamento", filter.getIdDepartament());
         }
 
-        // Búsqueda general (en nombre o código alfabético)
+        // Búsqueda general (en nombre)
         if (filter.getName() != null && !filter.getName().isBlank()) {
-            query.append(" and (lower(name) like :search");
+            query.append(" and lower(name) like :search");
             params.put("search", "%" + filter.getName().toLowerCase().trim() + "%");
         }
 
