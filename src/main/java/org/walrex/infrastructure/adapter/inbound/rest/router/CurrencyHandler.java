@@ -143,6 +143,43 @@ public class CurrencyHandler {
     }
 
     /**
+     * GET /api/v1/currencies/all - List all currencies without pagination
+     */
+    @WithSession
+    public Uni<Void> findAll(RoutingContext rc) {
+        try {
+            // Parse query parameters
+            String search = rc.queryParams().get("search");
+            String includeInactive = rc.queryParams().get("includeInactive");
+
+            // Por defecto, solo monedas activas
+            String status = "1";
+
+            // Si includeInactive es true, no filtrar por status
+            if ("true".equalsIgnoreCase(includeInactive)) {
+                status = null;
+            }
+
+            // Build filter using builder
+            CurrencyFilter filter = CurrencyFilter.builder()
+                    .search(search)
+                    .status(status)
+                    .build();
+
+            // Execute use case
+            return listCurrenciesUseCase.findAll(filter)
+                    .onItem().invoke(currencies -> {
+                        sendJson(rc, HttpResponseStatus.OK, currencies);
+                    })
+                    .onFailure().invoke(error -> handleError(rc, error))
+                    .replaceWithVoid();
+        } catch (Exception e) {
+            handleBadRequest(rc, "Invalid query parameters: " + e.getMessage());
+            return Uni.createFrom().voidItem();
+        }
+    }
+
+    /**
      * GET /api/v1/currencies/{id} - Get a currency by ID
      */
     @WithSession

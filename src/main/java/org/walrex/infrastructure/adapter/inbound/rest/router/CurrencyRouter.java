@@ -20,6 +20,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.walrex.application.dto.request.CreateCurrencyRequest;
 import org.walrex.application.dto.request.UpdateCurrencyRequest;
 import org.walrex.application.dto.response.CurrencyResponse;
+import org.walrex.application.dto.response.CurrencySelectResponse;
 
 @ApplicationScoped
 @RouteBase(path = "/api/v1/currencies", produces = "application/json")
@@ -176,6 +177,84 @@ public class CurrencyRouter {
     })
     public Uni<Void> list(RoutingContext rc) {
         return currencyHandler.list(rc);
+    }
+
+    /**
+     * GET /api/v1/currencies/all - List all currencies without pagination
+     */
+    @Route(path = "/all", methods = Route.HttpMethod.GET)
+    @Operation(
+        summary = "Obtener todas las monedas sin paginación",
+        description = "Obtiene un listado completo de todas las monedas activas sin paginación. " +
+                      "Optimizado para componentes de selección (select, dropdown, autocomplete). " +
+                      "Retorna solo los campos esenciales (id, código alfabético, código numérico, nombre)."
+    )
+    @Parameter(
+        name = "search",
+        description = "Búsqueda general en nombre y código alfabético",
+        in = ParameterIn.QUERY,
+        required = false,
+        schema = @Schema(type = SchemaType.STRING),
+        example = "USD"
+    )
+    @Parameter(
+        name = "active",
+        description = "Filtrar por estado activo/inactivo (por defecto solo activas)",
+        in = ParameterIn.QUERY,
+        required = false,
+        schema = @Schema(type = SchemaType.STRING),
+        example = "1"
+    )
+    @Parameter(
+        name = "includeInactive",
+        description = "Incluir monedas inactivas en el resultado",
+        in = ParameterIn.QUERY,
+        required = false,
+        schema = @Schema(type = SchemaType.BOOLEAN, defaultValue = "false"),
+        example = "false"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Lista de monedas obtenida exitosamente",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = CurrencySelectResponse.class, type = SchemaType.ARRAY),
+                examples = @ExampleObject(
+                    name = "Lista de monedas para select",
+                    value = """
+                        [
+                            {
+                                "id": 1,
+                                "alphabeticCode": "USD",
+                                "numericCode": "840",
+                                "name": "Dólar Estadounidense"
+                            },
+                            {
+                                "id": 2,
+                                "alphabeticCode": "EUR",
+                                "numericCode": "978",
+                                "name": "Euro"
+                            },
+                            {
+                                "id": 3,
+                                "alphabeticCode": "PEN",
+                                "numericCode": "604",
+                                "name": "Sol Peruano"
+                            }
+                        ]
+                        """
+                )
+            )
+        ),
+        @APIResponse(
+            responseCode = "400",
+            description = "Parámetros de consulta inválidos",
+            content = @Content(mediaType = "application/json")
+        )
+    })
+    public Uni<Void> findAll(RoutingContext rc) {
+        return currencyHandler.findAll(rc);
     }
 
     /**
