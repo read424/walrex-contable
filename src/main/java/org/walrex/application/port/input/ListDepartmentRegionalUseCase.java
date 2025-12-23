@@ -16,7 +16,7 @@ import org.walrex.application.dto.response.PagedResponse;
  * @version 1.0
  * @since 1.0
  */
-public interface ListDepartmentReginalUseCase {
+public interface ListDepartmentRegionalUseCase {
     /**
      * Lista departamentos regionales con paginación y filtros.
      *
