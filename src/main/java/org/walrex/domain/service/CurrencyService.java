@@ -10,6 +10,7 @@ import org.walrex.application.dto.query.CurrencyFilter;
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.response.AvailabilityResponse;
 import org.walrex.application.dto.response.CurrencyResponse;
+import org.walrex.application.dto.response.CurrencySelectResponse;
 import org.walrex.application.dto.response.PagedResponse;
 import org.walrex.application.port.input.CheckAvailabilityUseCase;
 import org.walrex.application.port.input.CreateCurrencyUseCase;
@@ -55,8 +56,12 @@ public class CurrencyService implements
     @Inject
     CurrencyDtoMapper currencyDtoMapper;
 
-    // TTL del cache: 5 minutos
+    // TTL del cache: 5 minutos para listado paginado
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+
+    // TTL del cache: 15 minutos para listado completo (/all endpoint)
+    // Mayor TTL porque los datos son más estáticos y se invalida en cada cambio
+    private static final Duration CACHE_ALL_TTL = Duration.ofMinutes(15);
 
     /**
      * Crea una nueva moneda.
@@ -138,6 +143,59 @@ public class CurrencyService implements
                     // Cachear el resultado (fire-and-forget)
                     log.debug("Caching result for key: {}", cacheKey);
                     return currencyCachePort.put(cacheKey, result, CACHE_TTL);
+                });
+    }
+
+    /**
+     * Obtiene todas las monedas que cumplen el filtro sin paginación.
+     * Retorna un DTO optimizado para componentes de selección.
+     *
+     * Implementa cache-aside pattern con TTL de 15 minutos:
+     * 1. Intenta obtener del cache
+     * 2. Si no existe, consulta la DB
+     * 3. Cachea el resultado por 15 minutos
+     * 4. Devuelve el resultado
+     *
+     * El cache se invalida automáticamente en create/update/delete.
+     *
+     * @param filter Filtros opcionales (por defecto solo monedas activas)
+     * @return Uni con lista completa de monedas optimizadas
+     */
+    @Override
+    public Uni<List<CurrencySelectResponse>> findAll(CurrencyFilter filter) {
+        log.info("Listing all currencies with filter: {}", filter);
+
+        // Generar clave única de cache
+        String cacheKey = CurrencyCacheKeyGenerator.generateKey(filter);
+
+        // Cache-aside pattern
+        return currencyCachePort.<CurrencySelectResponse>getList(cacheKey)
+                .onItem().transformToUni(cachedResult -> {
+                    if (cachedResult != null) {
+                        log.debug("Returning cached result for key: {}", cacheKey);
+                        return Uni.createFrom().item(cachedResult);
+                    }
+
+                    // Cache miss - consultar DB
+                    log.debug("Cache miss for key: {}. Querying database.", cacheKey);
+                    return fetchAllAndCache(filter, cacheKey);
+                });
+    }
+
+    /**
+     * Consulta la DB y cachea el resultado para endpoint /all.
+     */
+    private Uni<List<CurrencySelectResponse>> fetchAllAndCache(
+            CurrencyFilter filter,
+            String cacheKey) {
+
+        return currencyQueryPort.findAllWithFilter(filter)
+                .onItem().transform(currencyDtoMapper::toSelectResponseList)
+                .call(result -> {
+                    // Cachear el resultado por 15 minutos (fire-and-forget)
+                    log.debug("Caching result for key: {} with TTL of {} minutes",
+                            cacheKey, CACHE_ALL_TTL.toMinutes());
+                    return currencyCachePort.putList(cacheKey, result, CACHE_ALL_TTL);
                 });
     }
 

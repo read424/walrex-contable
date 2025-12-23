@@ -165,6 +165,24 @@ public class CurrencyPersistenceAdapter implements CurrencyRepositoryPort, Curre
         return repository.countWithFilters(filter);
     }
 
+    // ==================== CurrencyQueryPort - Listados sin Paginación ====================
+
+    @Override
+    public Uni<List<Currency>> findAllWithFilter(CurrencyFilter filter) {
+        // Crear una configuración de página que obtiene todos los resultados
+        // ordenados por nombre por defecto
+        PageRequest pageRequest = PageRequest.builder()
+                .page(0)
+                .size(Integer.MAX_VALUE)
+                .sortBy("name")
+                .sortDirection(PageRequest.SortDirection.ASCENDING)
+                .build();
+
+        return repository.findWithFilters(pageRequest, filter)
+                .onItem().transform(mapper::toDomain)
+                .collect().asList();
+    }
+
     // ==================== CurrencyQueryPort - Streaming ====================
 
     @Override

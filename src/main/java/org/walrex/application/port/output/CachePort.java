@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import org.walrex.application.dto.response.PagedResponse;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Puerto de salida genérico para operaciones de caché.
@@ -40,6 +41,28 @@ public interface CachePort<T> {
      * @return Uni que se completa cuando se invalida
      */
     Uni<Void> invalidate(String cacheKey);
+
+    /**
+     * Obtiene una lista desde la caché.
+     * Útil para endpoints sin paginación (ej: /all).
+     *
+     * @param cacheKey Clave única que identifica la consulta
+     * @param <R> Tipo de elementos en la lista
+     * @return Uni con la lista si existe en caché, null si no existe
+     */
+    <R> Uni<List<R>> getList(String cacheKey);
+
+    /**
+     * Almacena una lista en la caché.
+     * Útil para endpoints sin paginación (ej: /all).
+     *
+     * @param cacheKey Clave única que identifica la consulta
+     * @param value Lista a cachear
+     * @param ttl Tiempo de vida del cache
+     * @param <R> Tipo de elementos en la lista
+     * @return Uni que se completa cuando se almacena
+     */
+    <R> Uni<Void> putList(String cacheKey, List<R> value, Duration ttl);
 
     /**
      * Invalida todas las entradas en la caché.
