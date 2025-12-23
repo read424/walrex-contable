@@ -128,6 +128,20 @@ public interface CurrencyQueryPort {
      */
     Uni<Long> count(CurrencyFilter filter);
 
+    // ==================== Listados sin Paginación ====================
+
+    /**
+     * Lista todas las monedas que cumplen el filtro sin paginación.
+     *
+     * SQL dinámico con:
+     * - WHERE conditions basadas en CurrencyFilter
+     * - ORDER BY name ASC (por defecto)
+     *
+     * @param filter Filtros opcionales
+     * @return Uni con lista completa de monedas
+     */
+    Uni<List<Currency>> findAllWithFilter(CurrencyFilter filter);
+
     // ==================== Streaming ====================
 
     /**
