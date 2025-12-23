@@ -5,7 +5,10 @@ import io.smallrye.mutiny.Uni;
 import org.walrex.application.dto.query.CurrencyFilter;
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.response.CurrencyResponse;
+import org.walrex.application.dto.response.CurrencySelectResponse;
 import org.walrex.application.dto.response.PagedResponse;
+
+import java.util.List;
 
 public interface ListCurrenciesUseCase {
     /**
@@ -16,6 +19,20 @@ public interface ListCurrenciesUseCase {
      * @return Uni con respuesta paginada
      */
     Uni<PagedResponse<CurrencyResponse>> execute(PageRequest pageRequest, CurrencyFilter filter);
+
+    /**
+     * Obtiene todas las monedas que cumplen el filtro sin paginación.
+     * Retorna un DTO optimizado para componentes de selección (select, dropdown, autocomplete).
+     *
+     * Útil para:
+     * - Cargar opciones en selectores
+     * - Autocomplete
+     * - Listas de opciones en formularios
+     *
+     * @param filter Filtros opcionales (por defecto solo monedas activas)
+     * @return Uni con lista completa de monedas optimizadas
+     */
+    Uni<List<CurrencySelectResponse>> findAll(CurrencyFilter filter);
 
     /**
      * Obtiene todas las monedas activas como un stream reactivo.
