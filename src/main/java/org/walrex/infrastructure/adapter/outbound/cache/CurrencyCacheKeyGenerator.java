@@ -23,6 +23,7 @@ import java.util.HexFormat;
 public class CurrencyCacheKeyGenerator {
 
     private static final String CACHE_PREFIX = "currency:list:";
+    private static final String CACHE_ALL_PREFIX = "currency:all:";
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -65,12 +66,47 @@ public class CurrencyCacheKeyGenerator {
     }
 
     /**
+     * Genera una clave única de caché para una consulta de listado.
+     *
+     * Formato: currency:list:{hash}
+     * donde {hash} es un SHA-256 de todos los parámetros serializados.
+     *
+     * @param filter Filtros aplicados (puede ser null)
+     * @return Clave única para esta combinación de parámetros
+     */
+    public static String generateKey(CurrencyFilter filter) {
+        try {
+            // Crear un objeto que combine todos los parámetros
+            CacheKeyAllComponents components = new CacheKeyAllComponents(
+                    filter != null ? filter.getSearch() : null,
+                    filter != null ? filter.getAlphabeticCode() : null,
+                    filter != null ? filter.getNumericCode() : null,
+                    filter != null ? filter.getStatus() : null,
+                    filter != null ? filter.getIncludeDeleted() : "0"
+            );
+
+            // Serializar a JSON para tener una representación canónica
+            String jsonRepresentation = objectMapper.writeValueAsString(components);
+
+            // Generar hash SHA-256
+            String hash = generateSHA256Hash(jsonRepresentation);
+
+            return CACHE_ALL_PREFIX + hash;
+
+        } catch (JsonProcessingException e) {
+            // Si falla la serialización, usar una clave basada en string simple
+            return CACHE_ALL_PREFIX + buildFallbackKeyForAll(filter);
+        }
+    }
+
+    /**
      * Genera clave para invalidar todo el patrón de currencies.
+     * Invalida tanto claves paginadas (currency:list:*) como no paginadas (currency:all:*).
      *
      * @return Patrón para invalidar todas las claves de currency
      */
     public static String getInvalidationPattern() {
-        return CACHE_PREFIX + "*";
+        return "currency:*";
     }
 
     /**
@@ -117,6 +153,31 @@ public class CurrencyCacheKeyGenerator {
     }
 
     /**
+     * Construye clave alternativa si falla la serialización JSON.
+     */
+    private static String buildFallbackKeyForAll(CurrencyFilter filter) {
+        StringBuilder key = new StringBuilder();
+
+        if (filter != null) {
+            if (filter.getSearch() != null) {
+                key.append(":search:").append(filter.getSearch());
+            }
+            if (filter.getAlphabeticCode() != null) {
+                key.append(":alpha:").append(filter.getAlphabeticCode());
+            }
+            if (filter.getNumericCode() != null) {
+                key.append(":num:").append(filter.getNumericCode());
+            }
+            if (filter.getStatus() != null) {
+                key.append(":status:").append(filter.getStatus());
+            }
+            key.append(":deleted:").append(filter.getIncludeDeleted());
+        }
+
+        return String.valueOf(key.toString().hashCode());
+    }
+
+    /**
      * Record interno para serialización de componentes de la clave.
      * Asegura orden consistente de campos en JSON.
      */
@@ -130,5 +191,17 @@ public class CurrencyCacheKeyGenerator {
         String numericCode,
         String status,
         String includeDeleted
+    ) {}
+
+    /**
+     * Record interno para serialización de componentes de la clave /all.
+     * Similar a CacheKeyComponents pero sin campos de paginación.
+     */
+    private record CacheKeyAllComponents(
+            String search,
+            String alphabeticCode,
+            String numericCode,
+            String status,
+            String includeDeleted
     ) {}
 }

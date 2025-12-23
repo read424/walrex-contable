@@ -11,6 +11,7 @@ import org.walrex.application.dto.response.PagedResponse;
 import org.walrex.application.port.output.CachePort;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Implementación genérica de cache usando Redis.
@@ -99,6 +100,58 @@ public abstract class RedisCacheAdapter<T> implements CachePort<T> {
 
         } catch (Exception e) {
             log.warn("[{}] Error serializing value for cache key: {}. Error: {}", entityName, cacheKey, e.getMessage());
+            return Uni.createFrom().voidItem();
+        }
+    }
+
+    @Override
+    public <R> Uni<List<R>> getList(String cacheKey) {
+        log.debug("[{}] Attempting to get list from cache with key: {}", entityName, cacheKey);
+
+        return valueCommands.get(cacheKey)
+            .onItem().transformToUni(jsonValue -> {
+                if (jsonValue == null) {
+                    log.debug("[{}] Cache miss for key: {}", entityName, cacheKey);
+                    return Uni.createFrom().nullItem();
+                }
+
+                try {
+                    // Usar TypeReference genérico para deserializar listas
+                    List<R> result = objectMapper.readValue(jsonValue, new TypeReference<List<R>>() {});
+                    log.debug("[{}] Cache hit for list key: {}", entityName, cacheKey);
+                    return Uni.createFrom().item(result);
+                } catch (Exception e) {
+                    log.warn("[{}] Error deserializing cached list for key: {}. Error: {}", entityName, cacheKey, e.getMessage());
+                    // Si falla la deserialización, invalidar la clave corrupta
+                    return invalidate(cacheKey)
+                        .replaceWith(Uni.createFrom().nullItem());
+                }
+            })
+            .onFailure().invoke(error ->
+                log.warn("[{}] Error accessing cache for list key: {}. Error: {}", entityName, cacheKey, error.getMessage())
+            )
+            .onFailure().recoverWithNull(); // Si Redis falla, continuar sin cache
+    }
+
+    @Override
+    public <R> Uni<Void> putList(String cacheKey, List<R> value, Duration ttl) {
+        log.debug("[{}] Caching list with key: {} and TTL: {}", entityName, cacheKey, ttl);
+
+        try {
+            String jsonValue = objectMapper.writeValueAsString(value);
+
+            return valueCommands.setex(cacheKey, ttl.getSeconds(), jsonValue)
+                .onItem().invoke(() ->
+                    log.debug("[{}] Successfully cached list for key: {}", entityName, cacheKey)
+                )
+                .onFailure().invoke(error ->
+                    log.warn("[{}] Error caching list for key: {}. Error: {}", entityName, cacheKey, error.getMessage())
+                )
+                .onFailure().recoverWithNull() // Si falla, continuar sin cache
+                .replaceWithVoid();
+
+        } catch (Exception e) {
+            log.warn("[{}] Error serializing list for cache key: {}. Error: {}", entityName, cacheKey, e.getMessage());
             return Uni.createFrom().voidItem();
         }
     }
