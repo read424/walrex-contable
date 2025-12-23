@@ -3,6 +3,7 @@ package org.walrex.infrastructure.adapter.inbound.mapper;
 import org.mapstruct.*;
 import org.walrex.application.dto.request.CreateCurrencyRequest;
 import org.walrex.application.dto.response.CurrencyResponse;
+import org.walrex.application.dto.response.CurrencySelectResponse;
 import org.walrex.domain.model.Currency;
 
 import java.util.List;
@@ -71,6 +72,27 @@ public interface CurrencyDtoMapper {
      * @return Lista de DTOs de respuesta
      */
     List<CurrencyResponse> toResponseList(List<Currency> currencies);
+
+    /**
+     * Convierte el modelo de dominio a DTO de respuesta optimizado para selects.
+     *
+     * Mapeos especiales:
+     * - numericCode: Integer → String (usa formatNumericCode)
+     * - Solo incluye campos esenciales: id, alphabeticCode, numericCode, name
+     *
+     * @param currency Modelo de dominio
+     * @return CurrencySelectResponse DTO optimizado para selects
+     */
+    @Mapping(target = "numericCode", source = "numericCode", qualifiedByName = "formatNumericCode")
+    CurrencySelectResponse toSelectResponse(Currency currency);
+
+    /**
+     * Convierte una lista de Currency a lista de CurrencySelectResponse.
+     *
+     * @param currencies Lista de modelos de dominio
+     * @return Lista de DTOs optimizados para selects
+     */
+    List<CurrencySelectResponse> toSelectResponseList(List<Currency> currencies);
 
     // ==================== Métodos de Conversión Personalizados ====================
 
