@@ -3,6 +3,8 @@ package org.walrex.domain.model;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Domain model representing a line/detail of a journal entry.
@@ -46,6 +48,12 @@ public class JournalEntryLine {
      * Can be different from the main journal entry description.
      */
     private String description;
+
+    /**
+     * List of documents attached to this line.
+     */
+    @Builder.Default
+    private List<JournalEntryDocument> documents = new ArrayList<>();
 
     /**
      * Validates that the line has valid amounts.

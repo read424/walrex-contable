@@ -5,13 +5,15 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @Data
-@ToString(exclude = "journalEntry")
-@EqualsAndHashCode(callSuper = true, exclude = "journalEntry")
+@ToString(exclude = {"journalEntry", "documents"})
+@EqualsAndHashCode(callSuper = true, exclude = {"journalEntry", "documents"})
 @Entity
 @Table(name = "journal_entry_lines")
 public class JournalEntryLineEntity extends PanacheEntityBase {
@@ -35,4 +37,25 @@ public class JournalEntryLineEntity extends PanacheEntityBase {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @OneToMany(mappedBy = "journalEntryLine", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<JournalEntryDocumentEntity> documents = new ArrayList<>();
+
+    /**
+     * Helper method to add a document to the line.
+     * Maintains bidirectional relationship.
+     */
+    public void addDocument(JournalEntryDocumentEntity document) {
+        documents.add(document);
+        document.setJournalEntryLine(this);
+    }
+
+    /**
+     * Helper method to remove a document from the line.
+     */
+    public void removeDocument(JournalEntryDocumentEntity document) {
+        documents.remove(document);
+        document.setJournalEntryLine(null);
+    }
 }
