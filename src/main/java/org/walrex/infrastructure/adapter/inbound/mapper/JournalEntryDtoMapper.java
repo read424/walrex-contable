@@ -1,11 +1,13 @@
 package org.walrex.infrastructure.adapter.inbound.mapper;
 
 import org.mapstruct.*;
+import org.walrex.application.dto.response.JournalEntryDocumentResponse;
 import org.walrex.application.dto.response.JournalEntryLineResponse;
 import org.walrex.application.dto.response.JournalEntryResponse;
 import org.walrex.domain.model.AccountingBookType;
 import org.walrex.domain.model.EntryStatus;
 import org.walrex.domain.model.JournalEntry;
+import org.walrex.domain.model.JournalEntryDocument;
 import org.walrex.domain.model.JournalEntryLine;
 
 import java.util.List;
@@ -55,6 +57,14 @@ public interface JournalEntryDtoMapper {
      * @return JournalEntryLineResponse DTO
      */
     JournalEntryLineResponse lineToResponse(JournalEntryLine line);
+
+    /**
+     * Converts JournalEntryDocument domain model to response DTO.
+     *
+     * @param document JournalEntryDocument domain model
+     * @return JournalEntryDocumentResponse DTO
+     */
+    JournalEntryDocumentResponse documentToResponse(JournalEntryDocument document);
 
     /**
      * Converts a list of JournalEntryLine to response DTOs.

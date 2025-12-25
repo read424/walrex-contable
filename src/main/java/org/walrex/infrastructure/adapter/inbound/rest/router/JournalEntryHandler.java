@@ -11,14 +11,20 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.dto.request.CreateJournalEntryRequest;
+import org.walrex.application.dto.request.JournalEntryLineRequest;
 import org.walrex.application.dto.response.JournalEntryResponse;
 import org.walrex.application.port.input.CreateJournalEntryUseCase;
 import org.walrex.domain.exception.InvalidJournalEntryException;
 import org.walrex.domain.exception.UnbalancedJournalEntryException;
 import org.walrex.domain.model.JournalEntry;
+import org.walrex.domain.model.JournalEntryDocument;
+import org.walrex.domain.model.JournalEntryLine;
 import org.walrex.infrastructure.adapter.inbound.mapper.JournalEntryDtoMapper;
 import org.walrex.infrastructure.adapter.inbound.mapper.JournalEntryRequestMapper;
+import org.walrex.infrastructure.adapter.inbound.rest.service.DocumentProcessorService;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,6 +48,9 @@ public class JournalEntryHandler {
     @Inject
     JournalEntryDtoMapper journalEntryDtoMapper;
 
+    @Inject
+    DocumentProcessorService documentProcessorService;
+
     /**
      * POST /api/v1/journal-entries - Create a new journal entry
      */
@@ -58,11 +67,16 @@ public class JournalEntryHandler {
                 return Uni.createFrom().voidItem(); // Validation failed, error response already sent
             }
 
-            // Map request to domain model using MapStruct
-            JournalEntry journalEntry = journalEntryRequestMapper.toModel(request);
-
-            // Execute use case
-            return createJournalEntryUseCase.execute(journalEntry)
+            // Process documents for each line (decode base64 and store files)
+            return processLineDocuments(request.lines())
+                    // Map request to domain model with processed documents
+                    .onItem().transform(processedLines -> {
+                        JournalEntry journalEntry = journalEntryRequestMapper.toModel(request);
+                        journalEntry.setLines(processedLines);
+                        return journalEntry;
+                    })
+                    // Execute use case
+                    .onItem().transformToUni(journalEntry -> createJournalEntryUseCase.execute(journalEntry))
                     .onItem().invoke(savedJournalEntry -> {
                         // Convert domain model to DTO response
                         JournalEntryResponse response = journalEntryDtoMapper.toResponse(savedJournalEntry);
@@ -83,6 +97,49 @@ public class JournalEntryHandler {
             handleBadRequest(rc, "Invalid request body: " + e.getMessage());
             return Uni.createFrom().voidItem();
         }
+    }
+
+    /**
+     * Processes documents for all lines.
+     * Decodes base64, stores files, and creates JournalEntryLine with documents.
+     */
+    private Uni<List<JournalEntryLine>> processLineDocuments(List<JournalEntryLineRequest> lineRequests) {
+        if (lineRequests == null || lineRequests.isEmpty()) {
+            return Uni.createFrom().item(new ArrayList<>());
+        }
+
+        List<Uni<JournalEntryLine>> lineUnis = lineRequests.stream()
+                .map(this::processLinewithDocuments)
+                .toList();
+
+        return Uni.combine().all().unis(lineUnis)
+                .combinedWith(list -> {
+                    List<JournalEntryLine> result = new ArrayList<>();
+                    for (Object obj : list) {
+                        result.add((JournalEntryLine) obj);
+                    }
+                    return result;
+                });
+    }
+
+    /**
+     * Processes a single line with its documents.
+     */
+    private Uni<JournalEntryLine> processLinewithDocuments(JournalEntryLineRequest lineRequest) {
+        // Map basic line properties
+        JournalEntryLine line = journalEntryRequestMapper.lineToModel(lineRequest);
+
+        // Process documents if present
+        if (lineRequest.documents() != null && !lineRequest.documents().isEmpty()) {
+            return documentProcessorService.processDocuments(lineRequest.documents())
+                    .onItem().transform(documents -> {
+                        line.setDocuments(documents);
+                        return line;
+                    });
+        }
+
+        // No documents, return line as-is
+        return Uni.createFrom().item(line);
     }
 
     // ==================== Validation Methods ====================

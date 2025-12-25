@@ -2,7 +2,9 @@ package org.walrex.infrastructure.adapter.outbound.persistence.mapper;
 
 import org.mapstruct.*;
 import org.walrex.domain.model.JournalEntry;
+import org.walrex.domain.model.JournalEntryDocument;
 import org.walrex.domain.model.JournalEntryLine;
+import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryDocumentEntity;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryEntity;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryLineEntity;
 
@@ -95,4 +97,38 @@ public interface JournalEntryMapper {
      * @return List of JournalEntryLine
      */
     List<JournalEntryLine> linesToDomainList(List<JournalEntryLineEntity> entities);
+
+    /**
+     * Converts a domain document to a persistence document entity.
+     *
+     * @param document Domain model JournalEntryDocument
+     * @return JournalEntryDocumentEntity for persistence
+     */
+    @Mapping(target = "journalEntryLine", ignore = true)
+    JournalEntryDocumentEntity documentToEntity(JournalEntryDocument document);
+
+    /**
+     * Converts a persistence document entity to a domain document.
+     *
+     * @param entity JournalEntryDocumentEntity from persistence
+     * @return JournalEntryDocument domain model
+     */
+    @Mapping(target = "journalEntryLineId", source = "journalEntryLine.id")
+    JournalEntryDocument documentToDomain(JournalEntryDocumentEntity entity);
+
+    /**
+     * Converts a list of domain documents to persistence document entities.
+     *
+     * @param documents List of JournalEntryDocument
+     * @return List of JournalEntryDocumentEntity
+     */
+    List<JournalEntryDocumentEntity> documentsToEntityList(List<JournalEntryDocument> documents);
+
+    /**
+     * Converts a list of persistence document entities to domain documents.
+     *
+     * @param entities List of JournalEntryDocumentEntity
+     * @return List of JournalEntryDocument
+     */
+    List<JournalEntryDocument> documentsToDomainList(List<JournalEntryDocumentEntity> entities);
 }

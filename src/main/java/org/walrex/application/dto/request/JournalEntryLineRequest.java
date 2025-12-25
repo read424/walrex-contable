@@ -1,10 +1,12 @@
 package org.walrex.application.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * DTO for a journal entry line (detail).
@@ -36,7 +38,14 @@ public record JournalEntryLineRequest(
      * If null, will use the main entry description.
      */
     @Size(max = 500, message = "Line description must not exceed 500 characters")
-    String description
+    String description,
+
+    /**
+     * Optional list of documents to attach to this line.
+     * Documents are uploaded as base64-encoded strings.
+     */
+    @Valid
+    List<DocumentUploadRequest> documents
 ) {
     /**
      * Compact constructor for normalization.

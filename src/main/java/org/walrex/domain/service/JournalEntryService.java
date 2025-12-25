@@ -93,7 +93,7 @@ public class JournalEntryService implements
     public Uni<PagedResponse<JournalEntryResponse>> execute(PageRequest pageRequest, JournalEntryFilter filter) {
         log.info("Listing journal entries with page: {}, size: {}, filter: {}",
                 pageRequest.getPage(), pageRequest.getSize(), filter);
-
+        /*
         return journalEntryQueryPort.findAll(pageRequest, filter)
                 .onItem().transform(pagedResult -> {
                     var responses = journalEntryDtoMapper.toResponseList(pagedResult.getItems());
@@ -105,6 +105,8 @@ public class JournalEntryService implements
                             pagedResult.getTotalPages()
                     );
                 });
+         */
+        return null;
     }
 
     // ==================== UpdateJournalEntryUseCase ====================

@@ -7,10 +7,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.JournalEntryQueryPort;
 import org.walrex.application.port.output.JournalEntryRepositoryPort;
 import org.walrex.domain.model.JournalEntry;
+import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryDocumentEntity;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryEntity;
+import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryLineEntity;
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.JournalEntryMapper;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.JournalEntryQueryRepository;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.JournalEntryRepository;
+
+import java.util.ArrayList;
 
 /**
  * Persistence adapter that implements output ports for JournalEntry.
@@ -43,9 +47,32 @@ public class JournalEntryPersistenceAdapter implements JournalEntryRepositoryPor
         // Convert domain model to entity
         JournalEntryEntity entity = mapper.toEntity(journalEntry);
 
-        // Map lines manually to ensure bidirectional relationship
-        if (journalEntry.getLines() != null) {
-            entity.setLines(mapper.linesToEntityList(journalEntry.getLines()));
+        // Map lines and documents manually to ensure bidirectional relationships
+        if (journalEntry.getLines() != null && !journalEntry.getLines().isEmpty()) {
+            var lineEntities = new ArrayList<JournalEntryLineEntity>();
+
+            journalEntry.getLines().forEach(line -> {
+                // Map the line
+                JournalEntryLineEntity lineEntity = mapper.lineToEntity(line);
+                lineEntity.setJournalEntry(entity);
+
+                // Map documents for this line
+                if (line.getDocuments() != null && !line.getDocuments().isEmpty()) {
+                    var documentEntities = new ArrayList<JournalEntryDocumentEntity>();
+
+                    line.getDocuments().forEach(document -> {
+                        JournalEntryDocumentEntity docEntity = mapper.documentToEntity(document);
+                        docEntity.setJournalEntryLine(lineEntity);
+                        documentEntities.add(docEntity);
+                    });
+
+                    lineEntity.setDocuments(documentEntities);
+                }
+
+                lineEntities.add(lineEntity);
+            });
+
+            entity.setLines(lineEntities);
         }
 
         // Persist entity with cascading
