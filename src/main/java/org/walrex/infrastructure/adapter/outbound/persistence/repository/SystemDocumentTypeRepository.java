@@ -110,6 +110,20 @@ public class SystemDocumentTypeRepository implements PanacheRepositoryBase<Syste
         return count(query.toString(), params);
     }
 
+    /**
+     * Obtiene todos los tipos de documento con filtros sin paginación.
+     * Optimizado para componentes de selección (dropdown, select, autocomplete).
+     */
+    public Uni<List<SystemDocumentTypeEntity>> findAllWithFilter(SystemDocumentTypeFilter filter, Sort sort) {
+        StringBuilder query = new StringBuilder("1=1");
+        Map<String, Object> params = new HashMap<>();
+
+        // Aplicar los mismos filtros que en findWithFilters
+        applyFilters(query, params, filter);
+
+        return find(query.toString(), sort, params).list();
+    }
+
     // ==================== Streaming ====================
 
     /**

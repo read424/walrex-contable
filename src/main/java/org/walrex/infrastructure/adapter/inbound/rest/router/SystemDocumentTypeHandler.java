@@ -54,6 +54,9 @@ public class SystemDocumentTypeHandler {
     @Inject
     CheckAvailabilitySystemDocumentTypeUseCase checkAvailabilitySystemDocumentTypeUseCase;
 
+    @Inject
+    GetAllSystemDocumentTypesUseCase getAllSystemDocumentTypesUseCase;
+
     /**
      * POST /api/v1/system-document-types - Create new system document type
      */
@@ -149,6 +152,59 @@ public class SystemDocumentTypeHandler {
             return listSystemDocumentTypeUseCase.listar(pageRequest, filter)
                     .onItem().invoke(pagedResponse -> {
                         sendJson(rc, HttpResponseStatus.OK, pagedResponse);
+                    })
+                    .onFailure().invoke(error -> handleError(rc, error))
+                    .replaceWithVoid();
+        } catch (Exception e) {
+            handleBadRequest(rc, "Invalid query parameters: " + e.getMessage());
+            return Uni.createFrom().voidItem();
+        }
+    }
+
+    /**
+     * GET /api/v1/system-document-types/all - Get all system document types without pagination
+     * Optimized for select components (dropdown, autocomplete)
+     */
+    @WithSession
+    public Uni<Void> getAll(RoutingContext rc) {
+        try {
+            // Parse query parameters for filtering
+            String search = rc.queryParams().get("search");
+            String code = rc.queryParams().get("code");
+            String isRequiredParam = rc.queryParams().get("isRequired");
+            String forPersonParam = rc.queryParams().get("forPerson");
+            String forCompanyParam = rc.queryParams().get("forCompany");
+            String activeParam = rc.queryParams().get("active");
+
+            // Build filter using builder
+            // Default: active = true if not specified
+            SystemDocumentTypeFilter.SystemDocumentTypeFilterBuilder filterBuilder = SystemDocumentTypeFilter.builder()
+                    .search(search)
+                    .code(code)
+                    .includeDeleted("0"); // Always exclude deleted for /all endpoint
+
+            if (isRequiredParam != null && !isRequiredParam.isBlank()) {
+                filterBuilder.isRequired(Boolean.parseBoolean(isRequiredParam));
+            }
+            if (forPersonParam != null && !forPersonParam.isBlank()) {
+                filterBuilder.forPerson(Boolean.parseBoolean(forPersonParam));
+            }
+            if (forCompanyParam != null && !forCompanyParam.isBlank()) {
+                filterBuilder.forCompany(Boolean.parseBoolean(forCompanyParam));
+            }
+            // Default to active = true if not specified
+            if (activeParam != null && !activeParam.isBlank()) {
+                filterBuilder.active(Boolean.parseBoolean(activeParam));
+            } else {
+                filterBuilder.active(true); // Default: only active types
+            }
+
+            SystemDocumentTypeFilter filter = filterBuilder.build();
+
+            // Execute use case
+            return getAllSystemDocumentTypesUseCase.execute(filter)
+                    .onItem().invoke(response -> {
+                        sendJson(rc, HttpResponseStatus.OK, response);
                     })
                     .onFailure().invoke(error -> handleError(rc, error))
                     .replaceWithVoid();
