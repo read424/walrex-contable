@@ -22,6 +22,7 @@ import org.walrex.application.dto.request.UpdateSystemDocumentTypeRequest;
 import org.walrex.application.dto.response.AvailabilityResponse;
 import org.walrex.application.dto.response.PagedResponse;
 import org.walrex.application.dto.response.SystemDocumentTypeResponse;
+import org.walrex.application.dto.response.SystemDocumentTypeSelectResponse;
 
 @ApplicationScoped
 @RouteBase(path = "/api/v1/system-document-types", produces = "application/json")
@@ -108,6 +109,63 @@ public class SystemDocumentTypeRouter {
     })
     public Uni<Void> list(RoutingContext rc) {
         return systemDocumentTypeHandler.list(rc);
+    }
+
+    /**
+     * GET /api/v1/system-document-types/all - Get all system document types without pagination
+     */
+    @Route(path = "/all", methods = Route.HttpMethod.GET)
+    @Operation(
+        summary = "Listar todos los tipos de documento",
+        description = "Obtiene todos los tipos de documento sin paginación, optimizado para componentes de selección (select, dropdown, autocomplete). " +
+                      "Solo retorna campos esenciales. Los resultados se cachean en Redis por 5 minutos."
+    )
+    @Parameter(name = "active", description = "Filtrar solo tipos activos (default: true)",
+               in = ParameterIn.QUERY, schema = @Schema(type = SchemaType.BOOLEAN, defaultValue = "true"), example = "true")
+    @Parameter(name = "forPerson", description = "Filtrar tipos aplicables a personas",
+               in = ParameterIn.QUERY, schema = @Schema(type = SchemaType.BOOLEAN), example = "true")
+    @Parameter(name = "forCompany", description = "Filtrar tipos aplicables a empresas",
+               in = ParameterIn.QUERY, schema = @Schema(type = SchemaType.BOOLEAN), example = "false")
+    @Parameter(name = "isRequired", description = "Filtrar tipos requeridos",
+               in = ParameterIn.QUERY, schema = @Schema(type = SchemaType.BOOLEAN), example = "true")
+    @Parameter(name = "search", description = "Búsqueda en código y nombre",
+               in = ParameterIn.QUERY, schema = @Schema(type = SchemaType.STRING), example = "DPI")
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Lista obtenida exitosamente",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = SystemDocumentTypeSelectResponse[].class),
+                examples = @ExampleObject(
+                    name = "Lista de tipos de documento",
+                    value = """
+                        [
+                            {
+                                "id": 1,
+                                "code": "DPI",
+                                "name": "Documento Personal de Identificación",
+                                "forPerson": true,
+                                "forCompany": false,
+                                "priority": 1
+                            },
+                            {
+                                "id": 2,
+                                "code": "NIT",
+                                "name": "Número de Identificación Tributaria",
+                                "forPerson": true,
+                                "forCompany": true,
+                                "priority": 2
+                            }
+                        ]
+                        """
+                )
+            )
+        ),
+        @APIResponse(responseCode = "400", description = "Parámetros inválidos", content = @Content(mediaType = "application/json"))
+    })
+    public Uni<Void> getAll(RoutingContext rc) {
+        return systemDocumentTypeHandler.getAll(rc);
     }
 
     /**
