@@ -5,6 +5,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ReportingPolicy;
 import org.walrex.application.dto.response.SystemDocumentTypeResponse;
+import org.walrex.application.dto.response.SystemDocumentTypeSelectResponse;
 import org.walrex.domain.model.SystemDocumentType;
 
 import java.util.List;
@@ -24,4 +25,14 @@ public interface SystemDocumentTypeDtoMapper {
      * Convierte lista de modelos de dominio a lista de responses.
      */
     List<SystemDocumentTypeResponse> toResponseList(List<SystemDocumentType> domains);
+
+    /**
+     * Convierte modelo de dominio a SystemDocumentTypeSelectResponse (optimizado para selects).
+     */
+    SystemDocumentTypeSelectResponse toSelectResponse(SystemDocumentType domain);
+
+    /**
+     * Convierte lista de modelos de dominio a lista de select responses.
+     */
+    List<SystemDocumentTypeSelectResponse> toSelectResponseList(List<SystemDocumentType> domains);
 }
