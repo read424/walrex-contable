@@ -11,6 +11,7 @@ import org.walrex.application.dto.query.SystemDocumentTypeFilter;
 import org.walrex.application.dto.response.AvailabilityResponse;
 import org.walrex.application.dto.response.PagedResponse;
 import org.walrex.application.dto.response.SystemDocumentTypeResponse;
+import org.walrex.application.dto.response.SystemDocumentTypeSelectResponse;
 import org.walrex.application.port.input.*;
 import org.walrex.application.port.output.SystemDocumentTypeCachePort;
 import org.walrex.application.port.output.SystemDocumentTypeQueryPort;
@@ -34,6 +35,7 @@ public class SystemDocumentTypeService implements
         CreateSystemDocumentTypeUseCase,
         ListSystemDocumentTypeUseCase,
         GetSystemDocumentTypeUseCase,
+        GetAllSystemDocumentTypesUseCase,
         UpdateSystemDocumentTypeUseCase,
         DeleteSystemDocumentTypeUseCase,
         CheckAvailabilitySystemDocumentTypeUseCase {
@@ -170,6 +172,55 @@ public class SystemDocumentTypeService implements
         log.info("Streaming system document types with filter: {}", filter);
         return systemDocumentTypeQueryPort.streamWithFilter(filter)
                 .onItem().transform(systemDocumentTypeDtoMapper::toResponse);
+    }
+
+    /**
+     * Obtiene todos los tipos de documento sin paginación.
+     * Optimizado para componentes de selección (dropdown, select, autocomplete).
+     *
+     * Implementa cache-aside pattern:
+     * 1. Intenta obtener del cache
+     * 2. Si no existe, consulta la DB
+     * 3. Cachea el resultado
+     * 4. Devuelve el resultado
+     */
+    @Override
+    public Uni<List<SystemDocumentTypeSelectResponse>> execute(SystemDocumentTypeFilter filter) {
+        log.info("Getting all system document types with filter: {}", filter);
+
+        // Generar clave única de cache para la lista completa
+        String cacheKey = SystemDocumentTypeCacheKeyGenerator.generateListKey(filter);
+
+        // Cache-aside pattern
+        return systemDocumentTypeCachePort.<SystemDocumentTypeSelectResponse>getList(cacheKey)
+                .onItem().transformToUni(cachedResult -> {
+                    if (cachedResult != null) {
+                        log.debug("Returning cached list for key: {}", cacheKey);
+                        return Uni.createFrom().item(cachedResult);
+                    }
+
+                    // Cache miss - consultar DB
+                    log.debug("Cache miss for list key: {}. Querying database.", cacheKey);
+                    return fetchListFromDatabaseAndCache(filter, cacheKey);
+                });
+    }
+
+    /**
+     * Consulta la DB para obtener la lista completa y cachea el resultado.
+     */
+    private Uni<List<SystemDocumentTypeSelectResponse>> fetchListFromDatabaseAndCache(
+            SystemDocumentTypeFilter filter,
+            String cacheKey) {
+
+        return systemDocumentTypeQueryPort.findAllWithFilter(filter)
+                .onItem().transform(documentTypes -> documentTypes.stream()
+                        .map(systemDocumentTypeDtoMapper::toSelectResponse)
+                        .toList())
+                .call(result -> {
+                    // Cachear el resultado (fire-and-forget)
+                    log.debug("Caching list result for key: {}", cacheKey);
+                    return systemDocumentTypeCachePort.putList(cacheKey, result, CACHE_TTL);
+                });
     }
 
     /**
