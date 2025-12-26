@@ -34,6 +34,9 @@ public interface SystemDocumentTypeQueryPort {
 
     Uni<Long> count(SystemDocumentTypeFilter filter);
 
+    // Listado completo sin paginación (para selects, dropdowns)
+    Uni<List<SystemDocumentType>> findAllWithFilter(SystemDocumentTypeFilter filter);
+
     // Streaming
     Multi<SystemDocumentType> streamAll();
 
