@@ -186,6 +186,18 @@ public class SystemDocumentTypePersistenceAdapter
         return systemDocumentTypeRepository.countWithFilters(filter);
     }
 
+    @Override
+    public Uni<List<SystemDocumentType>> findAllWithFilter(SystemDocumentTypeFilter filter) {
+        // Ordenar por priority ASC, name ASC para componentes de selección
+        Sort sort = Sort.by("priority", Sort.Direction.Ascending)
+                .and("name", Sort.Direction.Ascending);
+
+        return systemDocumentTypeRepository.findAllWithFilter(filter, sort)
+                .onItem().transform(entities -> entities.stream()
+                        .map(systemDocumentTypeMapper::toDomain)
+                        .toList());
+    }
+
     // ==================== SystemDocumentTypeQueryPort - Streaming
     // ====================
 
