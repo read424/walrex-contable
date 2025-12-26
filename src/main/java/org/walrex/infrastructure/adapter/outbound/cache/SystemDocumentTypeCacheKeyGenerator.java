@@ -52,6 +52,41 @@ public class SystemDocumentTypeCacheKeyGenerator {
     }
 
     /**
+     * Genera una clave única de cache para la lista completa sin paginación.
+     * Usado por el endpoint /all optimizado para componentes de selección.
+     */
+    public static String generateListKey(SystemDocumentTypeFilter filter) {
+        StringBuilder key = new StringBuilder(PREFIX);
+        key.append(":all");
+
+        if (filter != null) {
+            if (filter.getSearch() != null && !filter.getSearch().isBlank()) {
+                key.append(":search:").append(filter.getSearch());
+            }
+            if (filter.getCode() != null && !filter.getCode().isBlank()) {
+                key.append(":code:").append(filter.getCode());
+            }
+            if (filter.getIsRequired() != null) {
+                key.append(":required:").append(filter.getIsRequired());
+            }
+            if (filter.getForPerson() != null) {
+                key.append(":person:").append(filter.getForPerson());
+            }
+            if (filter.getForCompany() != null) {
+                key.append(":company:").append(filter.getForCompany());
+            }
+            if (filter.getActive() != null) {
+                key.append(":active:").append(filter.getActive());
+            }
+            if (filter.getIncludeDeleted() != null) {
+                key.append(":deleted:").append(filter.getIncludeDeleted());
+            }
+        }
+
+        return key.toString();
+    }
+
+    /**
      * Retorna el patrón para invalidar todas las claves de cache de
      * SystemDocumentType.
      */
