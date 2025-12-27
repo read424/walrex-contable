@@ -36,5 +36,9 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
+    mcp:
+      server:
+        name: "RemesasBotServer"
+        version: 1.0.0
   # SmallRye Fault Tolerance Metrics
   smallrye-fault-tolerance:

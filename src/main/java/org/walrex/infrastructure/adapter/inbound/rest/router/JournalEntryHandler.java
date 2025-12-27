@@ -112,14 +112,13 @@ public class JournalEntryHandler {
                 .map(this::processLinewithDocuments)
                 .toList();
 
-        return Uni.combine().all().unis(lineUnis)
-                .combinedWith(list -> {
-                    List<JournalEntryLine> result = new ArrayList<>();
-                    for (Object obj : list) {
-                        result.add((JournalEntryLine) obj);
-                    }
-                    return result;
-                });
+        return Uni.combine().all().unis(lineUnis).with(list -> {
+            List<JournalEntryLine> result = new ArrayList<>();
+            for (Object obj : list) {
+                result.add((JournalEntryLine) obj);
+            }
+            return result;
+        });
     }
 
     /**
