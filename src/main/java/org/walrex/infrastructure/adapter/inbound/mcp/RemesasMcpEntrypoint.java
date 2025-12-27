@@ -1,31 +1,23 @@
 package org.walrex.infrastructure.adapter.inbound.mcp;
 
 import io.modelcontextprotocol.spec.McpSchema;
+import io.quarkiverse.mcp.server.Tool;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.Produces;
+import org.walrex.application.port.input.ConsultarPaisesInputPort;
+
+import java.util.List;
 
 @ApplicationScoped
-public class McpServerConfig {
+public class RemesasMcpEntrypoint {
 
     @Inject
-    ConsultarPaisesUseCase consultarPaisesUseCase; // Puerto de entrada (Interface en Application)
+    ConsultarPaisesInputPort consultarPaisesUseCase;
 
-    @Produces
-    @ApplicationScoped
-    public McpServer produceMcpServer() {
-        McpServer server = McpServer.builder()
-                .serverInfo(new McpSchema.Implementation("Remesas-Bot", "1.0"))
-                .capabilities(McpSchema.ServerCapabilities.builder()
-                        .tools(new McpSchema.ToolCapabilities())
-                        .build())
-                .build();
-
-        // El Adaptador llama al Caso de Uso de la capa de Application
-        server.registerTool("obtener_paises", "Consulta países para remesas", (args) -> {
-            return consultarPaisesUseCase.ejecutar();
-        });
-
-        return server;
+    @Tool(name = "consultarPaisesDisponibles",
+            description = "Obtiene la lista de países hacia los cuales el cliente puede realizar envíos.")
+    public List<String> consultarPaises() {
+        // Mantenemos la pureza hexagonal llamando al puerto de entrada
+        return consultarPaisesUseCase.ejecutar();
     }
 }
