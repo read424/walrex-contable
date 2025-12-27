@@ -47,3 +47,4 @@ nb-configuration.xml
 # Archivos markdown - solo versionar README.md
 *.md
 !README.md
+logs/

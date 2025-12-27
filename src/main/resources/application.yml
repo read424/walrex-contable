@@ -104,3 +104,49 @@ quarkus:
 
   # SmallRye Fault Tolerance Metrics
   smallrye-fault-tolerance:
+
+  # LangChain4j Configuration - Multiple Named Model Instances
+  langchain4j:
+    # Deshabilitar DevServices para usar providers externos
+    devservices:
+      enabled: false
+    # Especificar provider para embedding model
+    embedding-model:
+      provider: ollama
+    # Modelo "groq" usando OpenAI provider (Groq API)
+    groq:
+      chat-model:
+        provider: openai
+    # Modelo "ollama-local" usando Ollama provider
+    ollama-local:
+      chat-model:
+        provider: ollama
+    # Provider OpenAI - Configuración para modelo "groq"
+    openai:
+      groq:
+        base-url: https://api.groq.com/openai/v1
+        api-key: ${GROQ_API_KEY}
+        timeout: 60s
+        log-requests: false
+        log-responses: false
+        chat-model:
+          model-name: llama-3.1-8b-instant
+          temperature: 0.7
+    # Provider Ollama local
+    ollama:
+      ollama-local:
+        base-url: http://localhost:11434
+        timeout: 60s
+        log-requests: false
+        log-responses: false
+        chat-model:
+          model-id: llama3.2
+          temperature: 0.7
+      # Embedding model sin nombre (default)
+      base-url: http://localhost:11434
+      timeout: 60s
+      devservices:
+        enabled: false
+      embedding-model:
+        model-id: mxbai-embed-large
+        # mxbai genera embeddings de 1024 dimensiones
