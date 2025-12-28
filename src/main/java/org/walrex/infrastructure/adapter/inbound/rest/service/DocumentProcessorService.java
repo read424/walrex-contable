@@ -77,13 +77,12 @@ public class DocumentProcessorService {
                 .map(this::processDocument)
                 .toList();
 
-        return Uni.combine().all().unis(documentUnis)
-                .combinedWith(list -> {
-                    List<JournalEntryDocument> result = new ArrayList<>();
-                    for (Object obj : list) {
-                        result.add((JournalEntryDocument) obj);
-                    }
-                    return result;
-                });
+        return Uni.combine().all().unis(documentUnis).with(list -> {
+            List<JournalEntryDocument> result = new ArrayList<>();
+            for (Object obj : list) {
+                result.add((JournalEntryDocument) obj);
+            }
+            return result;
+        });
     }
 }

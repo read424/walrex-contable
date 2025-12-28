@@ -22,7 +22,7 @@ public class JournalEntryLineEntity extends PanacheEntityBase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "journal_entry_id", nullable = false)
     private JournalEntryEntity journalEntry;
 
@@ -38,7 +38,7 @@ public class JournalEntryLineEntity extends PanacheEntityBase {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @OneToMany(mappedBy = "journalEntryLine", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "journalEntryLine", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<JournalEntryDocumentEntity> documents = new ArrayList<>();
 

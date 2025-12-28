@@ -24,7 +24,7 @@ public class JournalEntryDocumentEntity extends PanacheEntityBase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "journal_entry_line_id", nullable = false)
     private JournalEntryLineEntity journalEntryLine;
 
