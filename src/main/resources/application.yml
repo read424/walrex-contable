@@ -150,3 +150,11 @@ quarkus:
       embedding-model:
         model-id: mxbai-embed-large
         # mxbai genera embeddings de 1024 dimensiones
+
+  # REST Client configuration for Binance P2P API
+  rest-client:
+    binance-p2p:
+      url: https://p2p.binance.com
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 30000
+      connect-timeout: 10000
