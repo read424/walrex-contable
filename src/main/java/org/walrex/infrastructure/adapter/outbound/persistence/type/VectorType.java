@@ -12,7 +12,12 @@ import java.sql.Types;
 
 /**
  * UserType personalizado para manejar vectores de pgvector en Hibernate
+ *
+ * TODO: Migrar a la nueva API de Hibernate 6.x (JdbcType/JavaType) cuando pgvector
+ *       tenga soporte oficial o cuando se actualice a versiones posteriores de Hibernate.
+ *       Los métodos nullSafeGet/nullSafeSet están deprecados pero aún funcionan en Hibernate 6.5.
  */
+@SuppressWarnings("deprecation")
 public class VectorType implements UserType<float[]> {
 
     @Override
@@ -42,6 +47,7 @@ public class VectorType implements UserType<float[]> {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public float[] nullSafeGet(ResultSet rs, int position, SharedSessionContractImplementor session, Object owner) throws SQLException {
         Object obj = rs.getObject(position);
         if (obj == null) return null;
@@ -54,6 +60,7 @@ public class VectorType implements UserType<float[]> {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void nullSafeSet(PreparedStatement st, float[] value, int index, SharedSessionContractImplementor session) throws SQLException {
         if (value == null) {
             st.setNull(index, Types.OTHER);
@@ -61,6 +68,11 @@ public class VectorType implements UserType<float[]> {
             PGvector vector = new PGvector(value);
             st.setObject(index, vector);
         }
+    }
+
+    @Override
+    public float[] replace(float[] detached, float[] managed, Object owner) {
+        return deepCopy(detached);
     }
 
     @Override

@@ -36,6 +36,19 @@
         </encoder>
     </appender>
 
+    <!-- Appender para PriceExchangePersistenceAdapter -->
+    <appender name="PRICE_EXCHANGE_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/price-exchange-adapter.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/price-exchange-adapter.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <root level="INFO">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="LOKI" />
@@ -52,4 +65,9 @@
     <logger name="io.quarkus.http.access-log" level="DEBUG" />
     <logger name="org.walrex.infrastructure.adapter.inbound.mapper" level="TRACE" />
     <logger name="org.walrex.infrastructure.adapter.outbound.persistence.mapper" level="TRACE" />
+
+    <!-- Logger específico para PriceExchangePersistenceAdapter - guarda en archivo -->
+    <logger name="org.walrex.infrastructure.adapter.outbound.persistence.PriceExchangePersistenceAdapter" level="DEBUG" additivity="true">
+        <appender-ref ref="PRICE_EXCHANGE_FILE" />
+    </logger>
 </configuration>

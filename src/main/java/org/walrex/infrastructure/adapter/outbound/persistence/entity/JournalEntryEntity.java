@@ -55,7 +55,7 @@ public class JournalEntryEntity extends PanacheEntityBase {
     @Column(length = 20)
     private EntryStatus status;
 
-    @OneToMany(mappedBy = "journalEntry", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "journalEntry", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<JournalEntryLineEntity> lines = new ArrayList<>();
 
