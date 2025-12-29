@@ -10,6 +10,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.domain.model.ExchangeRate;
+import org.walrex.domain.model.RemittanceRoute;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,16 +41,16 @@ class ExchangeRateServiceTest {
     @BeforeEach
     void setUp() {
         // Setup para el mock de persistencia (lenient porque no todos los tests lo usan)
-        Mockito.lenient().when(priceExchangePort.upsertRate(anyString(), anyString(), any(), any()))
+        Mockito.lenient().when(priceExchangePort.upsertRate(anyInt(), anyInt(), any(), any()))
                 .thenReturn(Uni.createFrom().item(1));
     }
 
     @Test
     void shouldFetchExchangeRatesSuccessfully() {
         // Arrange - Configurar rutas de remesas
-        List<org.walrex.domain.model.RemittanceRoute> routes = List.of(
-                new org.walrex.domain.model.RemittanceRoute("PEN", "VES", "USDT"),
-                new org.walrex.domain.model.RemittanceRoute("VES", "PEN", "USDT")
+        List<RemittanceRoute> routes = List.of(
+                new RemittanceRoute(1, "PEN",2, "VES", "USDT"),
+                new RemittanceRoute(2, "VES", 1,"PEN", "USDT")
         );
 
         Mockito.when(remittanceRoutePort.findAllActiveRoutes())
@@ -110,8 +111,8 @@ class ExchangeRateServiceTest {
     @Test
     void shouldHandleProviderFailureGracefully() {
         // Arrange - Configurar rutas de remesas
-        List<org.walrex.domain.model.RemittanceRoute> routes = List.of(
-                new org.walrex.domain.model.RemittanceRoute("PEN", "VES", "USDT")
+        List<RemittanceRoute> routes = List.of(
+                new RemittanceRoute(1,"PEN",2, "VES", "USDT")
         );
 
         Mockito.when(remittanceRoutePort.findAllActiveRoutes())
