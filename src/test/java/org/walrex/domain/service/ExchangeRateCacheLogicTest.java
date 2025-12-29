@@ -149,23 +149,10 @@ class ExchangeRateCacheLogicTest {
     }
 
     /**
-     * Test de integración: Verifica el flujo completo cuando no hay caché
+     * Nota: Los tests de integración completos (con llamadas a saveRateWithCache)
+     * no se incluyen porque el método es privado. Los tests de métodos públicos
+     * en ExchangeRateServiceTest cubren la integración completa.
      */
-    @Test
-    void shouldSaveToRedisPlusDBWhenCacheMiss() {
-        // Given
-        String cacheKey = "exchange_rate:PEN:VES:1:2";
-        when(cachePort.get(cacheKey)).thenReturn(Uni.createFrom().item(Optional.empty()));
-        when(cachePort.set(eq(cacheKey), any(), any())).thenReturn(Uni.createFrom().voidItem());
-        when(priceExchangePort.upsertRate(anyInt(), anyInt(), any(), any()))
-                .thenReturn(Uni.createFrom().item(1));
-
-        // La prueba real requeriría llamar al método saveRateWithCache
-        // que es privado, por lo que este test es más conceptual
-
-        // Verify
-        verify(cachePort, never()).get(anyString()); // Aún no se ha llamado
-    }
 
     /**
      * Helper methods para invocar métodos privados usando reflexión

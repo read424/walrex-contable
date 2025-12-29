@@ -45,7 +45,8 @@ class BinanceExchangeRateAdapterTest {
 
         response.setData(List.of(tradable, nonTradable));
 
-        when(binanceClient.searchP2POrders(any())).thenReturn(Uni.createFrom().item(response));
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(response));
 
         // Act
         List<ExchangeRate> result = adapter.fetchExchangeRates("USDT", "PEN", "BUY", null, null)
@@ -66,7 +67,8 @@ class BinanceExchangeRateAdapterTest {
 
         response.setData(List.of(normal, privileged));
 
-        when(binanceClient.searchP2POrders(any())).thenReturn(Uni.createFrom().item(response));
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(response));
 
         // Act
         List<ExchangeRate> result = adapter.fetchExchangeRates("USDT", "PEN", "BUY", null, null)
@@ -95,7 +97,8 @@ class BinanceExchangeRateAdapterTest {
 
         response.setData(List.of(data));
 
-        when(binanceClient.searchP2POrders(any())).thenReturn(Uni.createFrom().item(response));
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(response));
 
         // Act
         List<ExchangeRate> result = adapter.fetchExchangeRates("USDT", "PEN", "BUY", List.of("CreditBankofPeru", "BancoDeCredito", "Interbank", "Plin", "Yape", "ScotiabankPeru"), null)
@@ -124,7 +127,8 @@ class BinanceExchangeRateAdapterTest {
         BinanceP2PResponse response = createMockResponse();
         response.setData(new ArrayList<>());
 
-        when(binanceClient.searchP2POrders(any())).thenReturn(Uni.createFrom().item(response));
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(response));
 
         // Act
         List<ExchangeRate> result = adapter.fetchExchangeRates("USDT", "PEN", "BUY", null, null)
@@ -138,7 +142,8 @@ class BinanceExchangeRateAdapterTest {
     @Test
     void shouldHandleNullResponse() {
         // Arrange
-        when(binanceClient.searchP2POrders(any())).thenReturn(Uni.createFrom().nullItem());
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().nullItem());
 
         // Act
         List<ExchangeRate> result = adapter.fetchExchangeRates("USDT", "PEN", "BUY", null, null)
@@ -152,7 +157,7 @@ class BinanceExchangeRateAdapterTest {
     @Test
     void shouldRecoverFromApiFailure() {
         // Arrange
-        when(binanceClient.searchP2POrders(any()))
+        when(binanceClient.searchP2POrders(any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().failure(new RuntimeException("API Error")));
 
         // Act
