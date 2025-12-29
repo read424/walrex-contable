@@ -47,17 +47,15 @@ public class PriceExchangePersistenceAdapter implements PriceExchangeOutputPort 
             BigDecimal averagePrice,
             LocalDate exchangeDate) {
 
-        log.info("Upserting rate for currency base ID:{} -> quote ID:{} on {} with price {}",
-                currencyBaseId, currencyQuoteId, exchangeDate, averagePrice);
+        log.info("=== [UPSERT START] Thread: {} | base ID:{} -> quote ID:{} | price: {} | date: {} ===",
+                Thread.currentThread().getName(), currencyBaseId, currencyQuoteId, averagePrice, exchangeDate);
 
         // Paso 1: Desactivar cualquier registro activo existente para esta fecha y par de monedas
         return priceExchangeRepository.deactivateRatesByDate(
                 exchangeDate, currencyBaseId, currencyQuoteId, TYPE_OPERATION_REMESAS
         ).onItem().transformToUni(deactivatedCount -> {
-            if (deactivatedCount > 0) {
-                log.info("Deactivated {} existing active rate(s) for base:{} quote:{} on {}",
-                        deactivatedCount, currencyBaseId, currencyQuoteId, exchangeDate);
-            }
+            log.info("=== [DEACTIVATE] Thread: {} | Deactivated count: {} | base:{} -> quote:{} | date: {} ===",
+                    Thread.currentThread().getName(), deactivatedCount, currencyBaseId, currencyQuoteId, exchangeDate);
 
             // Paso 2: Crear nuevo registro activo
             PriceExchangeEntity newEntity = new PriceExchangeEntity();
@@ -68,14 +66,18 @@ public class PriceExchangePersistenceAdapter implements PriceExchangeOutputPort 
             newEntity.setDateExchange(exchangeDate);
             newEntity.setIsActive("1");
 
-            log.info("Creating new active rate: base ID:{} -> quote ID:{} = {} (date: {})",
-                    currencyBaseId, currencyQuoteId, averagePrice, exchangeDate);
+            log.info("=== [CREATE] Thread: {} | Creating entity: base:{} -> quote:{} = {} | date: {} ===",
+                    Thread.currentThread().getName(), currencyBaseId, currencyQuoteId, averagePrice, exchangeDate);
 
             return priceExchangeRepository.persistAndFlush(newEntity)
                     .map(saved -> {
-                        log.info("Successfully saved new rate with ID: {}", saved.getId());
+                        log.info("=== [SAVED] Thread: {} | Saved ID: {} | base:{} -> quote:{} = {} ===",
+                                Thread.currentThread().getName(), saved.getId(), currencyBaseId, currencyQuoteId, averagePrice);
                         return saved.getId();
                     });
-        });
+        }).onFailure().invoke(error ->
+                log.error("=== [ERROR] Thread: {} | Failed to upsert rate | base:{} -> quote:{} | error: {} ===",
+                        Thread.currentThread().getName(), currencyBaseId, currencyQuoteId, error.getMessage(), error)
+        );
     }
 }
