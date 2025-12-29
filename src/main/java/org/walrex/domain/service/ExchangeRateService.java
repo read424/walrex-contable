@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
+import org.walrex.application.port.output.PaymentMethodQueryPort;
 import org.walrex.application.port.output.PriceExchangeOutputPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeRate;
@@ -18,6 +19,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Servicio de dominio para gestionar tasas de cambio entre Perú y Venezuela
@@ -42,6 +44,9 @@ public class ExchangeRateService {
     @Inject
     RemittanceRouteOutputPort remittanceRoutePort;
 
+    @Inject
+    PaymentMethodQueryPort paymentMethodQueryPort;
+
     /**
      * Actualiza todas las tasas de cambio basado en las rutas de remesas configuradas
      *
@@ -59,10 +64,13 @@ public class ExchangeRateService {
 
                     log.info("Found {} active remittance routes", routes.size());
 
-                    // Agrupar por par de monedas (intermediaryAsset/currencyToCode) para evitar consultas duplicadas
+                    // Agrupar por par de monedas completo (currencyFrom/intermediaryAsset/currencyTo)
+                    // Ejemplo: PEN/USDT/VES, USD/USDT/VES
                     Map<String, RemittanceRoute> uniquePairs = routes.stream()
                             .collect(Collectors.toMap(
-                                    route -> route.intermediaryAsset() + "/" + route.currencyToCode(),
+                                    route -> route.getCurrencyFromCode() + "/" +
+                                            route.getIntermediaryAsset() + "/" +
+                                            route.getCurrencyToCode(),
                                     route -> route,
                                     (r1, r2) -> r1 // Si hay duplicados, tomar el primero
                             ));
@@ -90,13 +98,15 @@ public class ExchangeRateService {
                                 logRateSummary(update);
 
                                 // Calcular mejor tasa
-                                calculateBestRates(update);
+                                calculateAverageRates(update);
+
+                                // LOG para debug: mostrar el contenido de ExchangeRateUpdate
+                                log.info("=== ExchangeRateUpdate: {} ===", update);
 
                                 return update;
                             })
-                            .onItem().transformToUni(update ->
-                                    // Persistir promedios de las 5 mejores tasas
-                                    saveAverageRates(update).replaceWith(update)
+                            .onItem().transformToUni(update->
+                                saveAverageRates(update).replaceWith(update)
                             );
                 });
     }
@@ -108,25 +118,55 @@ public class ExchangeRateService {
             String pairKey,
             RemittanceRoute route) {
 
-        Integer assetId = route.intermediaryAssetId();
-        String asset = route.intermediaryAsset();
-        Integer fiatId = route.currencyToId();
-        String fiat = route.currencyToCode();
+        Long countryCurrencyFromId = route.getCountryCurrencyFromId();
+        Integer currencyFromId = route.getCurrencyFromId();
+        Long countryCurrencyToId = route.getCountryCurrencyToId();
+        Integer currencyToId = route.getCurrencyToId();
+        String asset = route.getIntermediaryAsset();
+        String currencyFrom = route.getCurrencyFromCode();
+        String currencyTo = route.getCurrencyToCode();
 
-        log.debug("Fetching rates for pair: {} ({}->{}), asset ID:{}, fiat ID:{}",
-                pairKey, route.currencyFromCode(), route.currencyToCode(), assetId, fiatId);
+        log.debug("Fetching rates for pair: {} ({}->{}), asset:{}",
+                pairKey, currencyFrom, currencyTo, asset);
 
-        Uni<List<ExchangeRate>> buyRates = fetchRates(asset, fiat, "BUY");
-        Uni<List<ExchangeRate>> sellRates = fetchRates(asset, fiat, "SELL");
+        // Query payment methods for FROM currency (for BUY USDT with PEN)
+        Uni<List<String>> fromPaymentMethods = paymentMethodQueryPort
+                .findBinancePaymentCodesByCountryCurrency(countryCurrencyFromId)
+                .onItem().invoke(methods -> {
+                    if (methods.isEmpty()) {
+                        log.warn("No payment methods configured for country_currency {}", countryCurrencyFromId);
+                    }
+                    log.debug("Payment methods for BUY {}/{}: {}", asset, currencyFrom, methods);
+                });
+
+        // Query payment methods for TO currency (for SELL USDT for VES)
+        Uni<List<String>> toPaymentMethods = paymentMethodQueryPort
+                .findBinancePaymentCodesByCountryCurrency(countryCurrencyToId)
+                .onItem().invoke(methods -> {
+                    if (methods.isEmpty()) {
+                        log.warn("No payment methods configured for country_currency {}", countryCurrencyToId);
+                    }
+                    log.debug("Payment methods for SELL {}/{}: {}", asset, currencyTo, methods);
+                });
+
+        // Fetch BUY rates with FROM payment methods
+        Uni<List<ExchangeRate>> buyRates = fromPaymentMethods
+                .onItem().transformToUni(payMethods ->
+                        fetchRates(asset, currencyFrom, "BUY", payMethods));
+
+        // Fetch SELL rates with TO payment methods
+        Uni<List<ExchangeRate>> sellRates = toPaymentMethods
+                .onItem().transformToUni(payMethods ->
+                        fetchRates(asset, currencyTo, "SELL", payMethods));
 
         return Uni.combine().all().unis(buyRates, sellRates)
                 .asTuple()
                 .map(tuple -> {
                     RouteRates rates = new RouteRates(
-                            assetId,
-                            asset,
-                            fiatId,
-                            fiat,
+                            currencyFromId,
+                            currencyFrom,
+                            currencyToId,
+                            currencyTo,
                             tuple.getItem1(),
                             tuple.getItem2()
                     );
@@ -147,10 +187,11 @@ public class ExchangeRateService {
     /**
      * Consulta tasas con manejo de errores
      */
-    private Uni<List<ExchangeRate>> fetchRates(String asset, String fiat, String tradeType) {
-        return exchangeRateProvider.fetchExchangeRates(asset, fiat, tradeType, null, null)
+    private Uni<List<ExchangeRate>> fetchRates(String asset, String fiat, String tradeType, List<String> payTypes) {
+        return exchangeRateProvider.fetchExchangeRates(asset, fiat, tradeType, payTypes, null)
                 .onFailure().invoke(error ->
-                        log.error("Failed to fetch {} {} {} rates: {}", asset, fiat, tradeType, error.getMessage())
+                        log.error("Failed to fetch {} {} {} rates with payTypes {}: {}",
+                                asset, fiat, tradeType, payTypes, error.getMessage())
                 )
                 .onFailure().recoverWithItem(Collections.emptyList());
     }
@@ -160,23 +201,25 @@ public class ExchangeRateService {
      */
     private void calculateBestRates(ExchangeRateUpdate update) {
         update.ratesByPair().forEach((pair, rates) -> {
-            String asset = rates.asset();
-            String fiat = rates.fiat();
+            String currencyFrom = rates.currencyFromCode();  // PEN
+            String currencyTo = rates.currencyToCode();      // VES
 
             // Mejor tasa para comprar (BUY) - precio más bajo
+            // BUY = comprar USDT con currencyFrom (ej: PEN)
             rates.buyRates().stream()
                     .min(Comparator.comparing(ExchangeRate::price))
                     .ifPresent(best ->
-                            log.info("Best {} BUY rate: {} {} per {} (merchant: {})",
-                                    pair, best.price(), fiat, asset, best.merchantNickName())
+                            log.info("Best {} BUY rate: {} {} per USDT (merchant: {})",
+                                    pair, best.price(), currencyFrom, best.merchantNickName())
                     );
 
             // Mejor tasa para vender (SELL) - precio más alto
+            // SELL = vender USDT por currencyTo (ej: VES)
             rates.sellRates().stream()
                     .max(Comparator.comparing(ExchangeRate::price))
                     .ifPresent(best ->
-                            log.info("Best {} SELL rate: {} {} per {} (merchant: {})",
-                                    pair, best.price(), fiat, asset, best.merchantNickName())
+                            log.info("Best {} SELL rate: {} {} per USDT (merchant: {})",
+                                    pair, best.price(), currencyTo, best.merchantNickName())
                     );
         });
 
@@ -185,12 +228,66 @@ public class ExchangeRateService {
     }
 
     /**
+     * Calcula el promedio de las 5 mejores tasas para BUY y SELL y las registra en logs
+     */
+    private void calculateAverageRates(ExchangeRateUpdate update) {
+        update.ratesByPair().forEach((pair, rates) -> {
+            String currencyFrom = rates.currencyFromCode();  // PEN
+            String currencyTo = rates.currencyToCode();      // VES
+
+            // Calcular promedio de las 5 mejores tasas BUY (precios más bajos)
+            // BUY = comprar USDT con currencyFrom (ej: PEN)
+            if (!rates.buyRates().isEmpty()) {
+                List<ExchangeRate> top5Buy = rates.buyRates().stream()
+                        .sorted(Comparator.comparing(ExchangeRate::price))
+                        .limit(5)
+                        .toList();
+
+                BigDecimal sumBuy = top5Buy.stream()
+                        .map(ExchangeRate::price)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal avgBuy = sumBuy.divide(
+                        BigDecimal.valueOf(top5Buy.size()),
+                        5,
+                        RoundingMode.HALF_UP
+                );
+
+                log.info("Average {} BUY rate (top 5): {} {} per USDT (from {} rates)",
+                        pair, avgBuy, currencyFrom, top5Buy.size());
+            }
+
+            // Calcular promedio de las 5 mejores tasas SELL (precios más altos)
+            // SELL = vender USDT por currencyTo (ej: VES)
+            if (!rates.sellRates().isEmpty()) {
+                List<ExchangeRate> top5Sell = rates.sellRates().stream()
+                        .sorted(Comparator.comparing(ExchangeRate::price).reversed())
+                        .limit(5)
+                        .toList();
+
+                BigDecimal sumSell = top5Sell.stream()
+                        .map(ExchangeRate::price)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal avgSell = sumSell.divide(
+                        BigDecimal.valueOf(top5Sell.size()),
+                        5,
+                        RoundingMode.HALF_UP
+                );
+
+                log.info("Average {} SELL rate (top 5): {} {} per USDT (from {} rates)",
+                        pair, avgSell, currencyTo, top5Sell.size());
+            }
+        });
+    }
+
+    /**
      * Calcula tasas cruzadas entre diferentes pares usando un activo intermediario
      * Por ejemplo: PEN -> USDT -> VES
      */
     private void calculateCrossRates(ExchangeRateUpdate update) {
         List<String> fiatCurrencies = update.ratesByPair().values().stream()
-                .map(RouteRates::fiat)
+                .map(RouteRates::currencyFromCode)
                 .distinct()
                 .toList();
 
@@ -216,7 +313,7 @@ public class ExchangeRateService {
      */
     private RouteRates findRatesForFiat(ExchangeRateUpdate update, String fiat) {
         return update.ratesByPair().values().stream()
-                .filter(rates -> rates.fiat().equals(fiat))
+                .filter(rates -> rates.currencyFromCode().equals(fiat))
                 .findFirst()
                 .orElse(null);
     }
@@ -248,27 +345,50 @@ public class ExchangeRateService {
     }
 
     /**
-     * Guarda los promedios de las 5 mejores tasas de cada par
+     * Guarda las tasas cruzadas de cada par con margen del 5%
      * IMPORTANTE: Ejecuta secuencialmente para evitar conflictos de sesión en Hibernate Reactive
      */
     private Uni<Void> saveAverageRates(ExchangeRateUpdate update) {
+        log.info("=== [SAVE AVERAGE RATES START] Thread: {} | Pairs to process: {} ===",
+                Thread.currentThread().getName(), update.ratesByPair().size());
+
         LocalDate today = LocalDate.now();
 
         // Crear lista de operaciones de guardado para cada par
         List<Uni<Integer>> saveOperations = update.ratesByPair().values().stream()
-                .flatMap(rates -> {
-                    Integer assetId = rates.assetCurrencyId();
-                    Integer fiatId = rates.fiatCurrencyId();
-                    String asset = rates.asset();
-                    String fiat = rates.fiat();
+                .map(rates -> {
+                    Integer currencyFromId = rates.currencyFromId();  // ID moneda origen (PEN)
+                    Integer currencyToId = rates.currencyToId();      // ID moneda destino (VES)
+                    String currencyFrom = rates.currencyFromCode();   // PEN
+                    String currencyTo = rates.currencyToCode();       // VES
 
-                    // Crear dos operaciones: una para BUY, otra para SELL
-                    return java.util.stream.Stream.of(
-                            calculateAndSaveAverage(rates.buyRates(), assetId, asset, fiatId, fiat, true, today),
-                            calculateAndSaveAverage(rates.sellRates(), assetId, asset, fiatId, fiat, false, today)
-                    );
+                    log.info("=== [SAVE PREP] Route: {} -> {} | buyRates:{} sellRates:{} ===",
+                            currencyFrom, currencyTo, rates.buyRates().size(), rates.sellRates().size());
+
+                    // Calcular promedios
+                    BigDecimal avgBuy = calculateTop5Average(rates.buyRates(), true);   // Promedio compra USDT con PEN
+                    BigDecimal avgSell = calculateTop5Average(rates.sellRates(), false); // Promedio venta USDT por VES
+
+                    log.info("=== [AVERAGES] BUY USDT/{}: {} | SELL USDT/{}: {} ===",
+                            currencyFrom, avgBuy, currencyTo, avgSell);
+
+                    // Calcular tasa cruzada: cuántos VES por cada PEN
+                    // Fórmula: precio_venta_VES / precio_compra_PEN
+                    BigDecimal crossRate = avgSell.divide(avgBuy, 5, RoundingMode.HALF_UP);
+
+                    // Aplicar margen de ganancia del 5%
+                    BigDecimal marginRate = crossRate.multiply(BigDecimal.valueOf(1.05))
+                            .setScale(5, RoundingMode.HALF_UP);
+
+                    log.info("=== [CROSS RATE] {}->{} | Without margin: {} | With 5% margin: {} ===",
+                            currencyFrom, currencyTo, crossRate, marginRate);
+
+                    // Guardar tasa cruzada PEN -> VES con 5% margen
+                    return saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo, marginRate, today, "CROSS_RATE");
                 })
                 .toList();
+
+        log.info("=== [SAVE OPS] Total save operations created: {} ===", saveOperations.size());
 
         if (saveOperations.isEmpty()) {
             log.warn("No rates to save");
@@ -276,13 +396,15 @@ public class ExchangeRateService {
         }
 
         // Ejecutar las persistencias SECUENCIALMENTE para evitar conflictos de sesión
-        // Comenzamos con un Uni inicial que devuelve lista vacía
         Uni<List<Integer>> chain = Uni.createFrom().item(new java.util.ArrayList<Integer>());
 
-        // Concatenamos cada operación de guardado secuencialmente
+        int opIndex = 0;
         for (Uni<Integer> saveOp : saveOperations) {
+            final int currentIndex = opIndex++;
             chain = chain.onItem().transformToUni(list ->
-                saveOp.onItem().transform(id -> {
+                saveOp.onItem().invoke(id ->
+                        log.info("=== [SAVE CHAIN] Operation {} completed with ID: {} ===", currentIndex, id)
+                ).onItem().transform(id -> {
                     list.add(id);
                     return list;
                 })
@@ -290,65 +412,58 @@ public class ExchangeRateService {
         }
 
         return chain.onItem().invoke(savedIds ->
-                log.info("Saved {} average rates", savedIds.size())
+                log.info("=== [SAVE COMPLETE] Saved {} average rates | IDs: {} ===", savedIds.size(), savedIds)
         ).replaceWithVoid();
     }
 
     /**
-     * Calcula el promedio de las 5 mejores tasas y las guarda
-     *
-     * @param rates Lista de tasas
-     * @param baseId ID de la moneda base en la tabla currencies
-     * @param baseCode Código moneda base (para logging)
-     * @param quoteId ID de la moneda quote en la tabla currencies
-     * @param quoteCode Código moneda quote (para logging)
-     * @param isBuy true para BUY (mejores = precios más bajos), false para SELL (mejores = precios más altos)
-     * @param date Fecha
-     * @return Uni con el ID del registro guardado
+     * Calcula el promedio de las 5 mejores tasas
      */
-    private Uni<Integer> calculateAndSaveAverage(
-            List<ExchangeRate> rates,
-            Integer baseId,
-            String baseCode,
-            Integer quoteId,
-            String quoteCode,
-            boolean isBuy,
-            LocalDate date) {
-
+    private BigDecimal calculateTop5Average(List<ExchangeRate> rates, boolean isBuy) {
         if (rates == null || rates.isEmpty()) {
-            log.warn("No rates available for {}/{} {}", baseCode, quoteCode, isBuy ? "BUY" : "SELL");
-            return Uni.createFrom().item(0);
+            return BigDecimal.ZERO;
         }
 
-        // Ordenar por precio: ascendente para BUY, descendente para SELL
         List<ExchangeRate> sorted = rates.stream()
                 .sorted(isBuy
-                        ? Comparator.comparing(ExchangeRate::price)
-                        : Comparator.comparing(ExchangeRate::price).reversed())
-                .limit(5)  // Tomar las 5 mejores
+                        ? Comparator.comparing(ExchangeRate::price)           // BUY: precios más bajos
+                        : Comparator.comparing(ExchangeRate::price).reversed()) // SELL: precios más altos
+                .limit(5)
                 .toList();
 
-        // Calcular promedio
         BigDecimal sum = sorted.stream()
                 .map(ExchangeRate::price)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal average = sum.divide(
-                BigDecimal.valueOf(sorted.size()),
-                5,
-                RoundingMode.HALF_UP
-        );
+        return sum.divide(BigDecimal.valueOf(sorted.size()), 5, RoundingMode.HALF_UP);
+    }
 
-        log.info("Calculated average for {}/{} (ID:{} -> ID:{}) {}: {} (from {} rates)",
-                baseCode, quoteCode, baseId, quoteId, isBuy ? "BUY" : "SELL", average, sorted.size());
+    /**
+     * Guarda una tasa en la base de datos
+     */
+    private Uni<Integer> saveRate(
+            Integer baseId,
+            String baseCode,
+            Integer quoteId,
+            String quoteCode,
+            BigDecimal price,
+            LocalDate date,
+            String operationType) {
 
-        // Guardar promedio usando los IDs de monedas
-        return priceExchangePort.upsertRate(baseId, quoteId, average, date)
+        log.info("=== [SAVE RATE] {} | {}/{} ({}→{}) | price: {} | date: {} ===",
+                operationType, baseCode, quoteCode, baseId, quoteId, price, date);
+
+        return priceExchangePort.upsertRate(baseId, quoteId, price, date)
+                .onItem().invoke(savedId ->
+                        log.info("=== [SAVED] {} {}/{} | ID: {} ===", operationType, baseCode, quoteCode, savedId)
+                )
                 .onFailure().invoke(error ->
-                        log.error("Failed to save average rate for {}/{}: {}", baseCode, quoteCode, error.getMessage())
+                        log.error("=== [SAVE FAILED] {} {}/{} | Error: {} ===",
+                                operationType, baseCode, quoteCode, error.getMessage(), error)
                 )
                 .onFailure().recoverWithItem(0);
     }
+
 
     /**
      * Record para encapsular el resultado de la actualización
@@ -361,11 +476,11 @@ public class ExchangeRateService {
      * Record para las tasas de un par de monedas específico
      */
     public record RouteRates(
-            Integer assetCurrencyId,      // ID de la moneda base (intermediary asset) en la tabla currencies
-            String asset,
-            Integer fiatCurrencyId,        // ID de la moneda quote (fiat) en la tabla currencies
-            String fiat,
-            List<ExchangeRate> buyRates,
-            List<ExchangeRate> sellRates
+            Integer currencyFromId,        // ID moneda origen (ej: PEN)
+            String currencyFromCode,       // Código moneda origen (ej: PEN)
+            Integer currencyToId,          // ID moneda destino (ej: VES)
+            String currencyToCode,         // Código moneda destino (ej: VES)
+            List<ExchangeRate> buyRates,   // Tasas para comprar USDT con moneda origen
+            List<ExchangeRate> sellRates   // Tasas para vender USDT por moneda destino
     ) {}
 }
