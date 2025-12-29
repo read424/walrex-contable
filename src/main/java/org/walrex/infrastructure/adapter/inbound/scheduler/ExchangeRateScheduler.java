@@ -42,7 +42,7 @@ public class ExchangeRateScheduler {
      * IMPORTANTE: Scheduler solo actúa como TRIGGER
      * La lógica reactiva se ejecuta dentro del EventLoop vía vertx.runOnContext()
      */
-    @Scheduled(cron = "0 */2 * * * ?", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(cron = "0 */10 * * * ?", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public Uni<Void> updateExchangeRates() {
         log.info("=== Scheduler triggered at {} ===", java.time.LocalDateTime.now());
 
