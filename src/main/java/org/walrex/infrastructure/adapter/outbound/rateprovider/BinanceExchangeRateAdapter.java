@@ -84,6 +84,64 @@ public class BinanceExchangeRateAdapter implements ExchangeRateProviderPort {
                 .onFailure().recoverWithItem(Collections.emptyList());
     }
 
+    @Override
+    public Uni<List<ExchangeRate>> fetchExchangeRates(
+            String asset,
+            String fiat,
+            String tradeType,
+            List<String> payTypes,
+            BigDecimal transAmount,
+            BigDecimal transCryptoAmount) {
+
+        log.info("Fetching exchange rates from Binance P2P: asset={}, fiat={}, tradeType={}, transCryptoAmount={}",
+                asset, fiat, tradeType, transCryptoAmount);
+
+        BinanceP2PRequest request = BinanceP2PRequest.builder()
+                .additionalKycVerifyFilter(0)
+                .asset(asset)
+                .classifies(List.of("mass", "profession", "fiat_trade"))
+                .countries(Collections.emptyList())
+                .fiat(fiat)
+                .filterType("all")
+                .page(1)
+                .payTypes(payTypes != null ? payTypes : Collections.emptyList())
+                .periods(Collections.emptyList())
+                .proMerchantAds(false)
+                .publisherType(null)
+                .rows(10)
+                .shieldMerchantAds(false)
+                .tradeType(tradeType)
+                .transAmount(transAmount)
+                .transCryptoAmount(transCryptoAmount)
+                .build();
+
+        // Headers para evitar compresión gzip que causa problemas de parsing
+        return binanceClient.searchP2POrders(
+                "identity",  // No gzip, solo identidad
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",  // User agent
+                "application/json",  // Accept
+                request
+        ).map(response -> {
+                    if (response == null || response.getData() == null) {
+                        log.warn("Empty response from Binance P2P API");
+                        return Collections.<ExchangeRate>emptyList();
+                    }
+
+                    // Filtrar y transformar los datos
+                    List<ExchangeRate> rates = response.getData().stream()
+                            .filter(this::isValidP2PData)
+                            .map(data -> mapToExchangeRate(data, asset, fiat, tradeType))
+                            .collect(Collectors.toList());
+
+                    log.info("Fetched {} exchange rates from Binance P2P", rates.size());
+                    return rates;
+                })
+                .onFailure().invoke(error ->
+                        log.error("Error fetching rates from Binance P2P: {}", error.getMessage(), error)
+                )
+                .onFailure().recoverWithItem(Collections.emptyList());
+    }
+
     /**
      * Valida que el registro de Binance sea válido según las reglas de negocio:
      * - isTradable debe ser true

@@ -26,7 +26,8 @@ public record BinanceP2PRequest(
         Integer rows,
         Boolean shieldMerchantAds,
         String tradeType,          // BUY o SELL
-        BigDecimal transAmount     // Opcional
+        BigDecimal transAmount,    // Opcional - monto en fiat para BUY
+        BigDecimal transCryptoAmount // Opcional - monto en crypto para SELL
 ) {
     /**
      * Crea un request por defecto para consultar tasas
@@ -48,6 +49,7 @@ public record BinanceP2PRequest(
                 .shieldMerchantAds(false)
                 .tradeType(tradeType)
                 .transAmount(null)
+                .transCryptoAmount(null)
                 .build();
     }
 }
