@@ -4,20 +4,25 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.walrex.application.port.output.ExchangeRateCachePort;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.application.port.output.PaymentMethodQueryPort;
 import org.walrex.application.port.output.PriceExchangeOutputPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeRate;
+import org.walrex.domain.model.ExchangeRateCache;
 import org.walrex.domain.model.RemittanceRoute;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,6 +40,9 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class ExchangeRateService {
 
+    private static final BigDecimal CHANGE_THRESHOLD_PERCENT = BigDecimal.valueOf(0.5); // ±0.5%
+    private static final Duration CACHE_TTL = Duration.ofHours(12); // 12 horas
+
     @Inject
     ExchangeRateProviderPort exchangeRateProvider;
 
@@ -46,6 +54,9 @@ public class ExchangeRateService {
 
     @Inject
     PaymentMethodQueryPort paymentMethodQueryPort;
+
+    @Inject
+    ExchangeRateCachePort cachePort;
 
     /**
      * Actualiza todas las tasas de cambio basado en las rutas de remesas configuradas
@@ -167,6 +178,8 @@ public class ExchangeRateService {
                             currencyFrom,
                             currencyToId,
                             currencyTo,
+                            countryCurrencyFromId,
+                            countryCurrencyToId,
                             tuple.getItem1(),
                             tuple.getItem2()
                     );
@@ -383,8 +396,17 @@ public class ExchangeRateService {
                     log.info("=== [CROSS RATE] {}->{} | Without margin: {} | With 5% margin: {} ===",
                             currencyFrom, currencyTo, crossRate, marginRate);
 
-                    // Guardar tasa cruzada PEN -> VES con 5% margen
-                    return saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo, marginRate, today, "CROSS_RATE");
+                    // Verificar caché y decidir si guardar en BD
+                    return saveRateWithCache(
+                            currencyFromId,
+                            currencyFrom,
+                            currencyToId,
+                            currencyTo,
+                            rates.countryCurrencyFromId(),
+                            rates.countryCurrencyToId(),
+                            marginRate,
+                            today
+                    );
                 })
                 .toList();
 
@@ -439,6 +461,146 @@ public class ExchangeRateService {
     }
 
     /**
+     * Guarda una tasa con verificación de caché para evitar escrituras innecesarias en BD.
+     *
+     * Lógica:
+     * 1. Genera clave de caché
+     * 2. Consulta caché
+     * 3. Si no existe en caché → Guardar en Redis + BD
+     * 4. Si existe en caché:
+     *    - Calcular diferencia porcentual
+     *    - Si dentro de ±0.5% → Solo actualizar TTL en Redis
+     *    - Si excede ±0.5% → Guardar en Redis + BD
+     */
+    private Uni<Integer> saveRateWithCache(
+            Integer currencyFromId,
+            String currencyFrom,
+            Integer currencyToId,
+            String currencyTo,
+            Long countryCurrencyFromId,
+            Long countryCurrencyToId,
+            BigDecimal newRate,
+            LocalDate date) {
+
+        String cacheKey = ExchangeRateCache.generateCacheKey(
+                currencyFrom, currencyTo, countryCurrencyFromId, countryCurrencyToId);
+
+        log.debug("=== [CACHE CHECK] Key: {} | NewRate: {} ===", cacheKey, newRate);
+
+        return cachePort.get(cacheKey)
+                .flatMap(cachedOptional -> {
+                    if (cachedOptional.isEmpty()) {
+                        // No existe en caché → Guardar en Redis + BD
+                        log.info("=== [CACHE MISS] {}/{} | Saving to Redis + DB ===",
+                                currencyFrom, currencyTo);
+                        return saveToRedisAndDb(cacheKey, currencyFrom, currencyTo,
+                                countryCurrencyFromId, countryCurrencyToId,
+                                currencyFromId, currencyToId, newRate, date);
+                    }
+
+                    ExchangeRateCache cached = cachedOptional.get();
+                    BigDecimal cachedRate = cached.getRate();
+                    BigDecimal percentageChange = calculatePercentageChange(newRate, cachedRate);
+
+                    log.info("=== [CACHE HIT] {}/{} | Cached: {} | New: {} | Change: {}% ===",
+                            currencyFrom, currencyTo, cachedRate, newRate, percentageChange);
+
+                    if (exceedsThreshold(percentageChange)) {
+                        // Excede threshold → Guardar en Redis + BD
+                        log.info("=== [THRESHOLD EXCEEDED] {}/{} | Change {}% > {}% | Saving to Redis + DB ===",
+                                currencyFrom, currencyTo, percentageChange, CHANGE_THRESHOLD_PERCENT);
+                        return saveToRedisAndDb(cacheKey, currencyFrom, currencyTo,
+                                countryCurrencyFromId, countryCurrencyToId,
+                                currencyFromId, currencyToId, newRate, date);
+                    } else {
+                        // Dentro del threshold → Solo actualizar TTL en Redis
+                        log.info("=== [WITHIN THRESHOLD] {}/{} | Change {}% <= {}% | Updating TTL only ===",
+                                currencyFrom, currencyTo, percentageChange, CHANGE_THRESHOLD_PERCENT);
+                        return updateCacheTTL(cacheKey, currencyFrom, currencyTo,
+                                countryCurrencyFromId, countryCurrencyToId, newRate);
+                    }
+                })
+                .onFailure().invoke(error ->
+                        log.error("=== [CACHE ERROR] {}/{} | Falling back to direct DB save | Error: {} ===",
+                                currencyFrom, currencyTo, error.getMessage())
+                )
+                .onFailure().recoverWithUni(() -> {
+                    // Si Redis falla, guardar directo en BD
+                    log.warn("=== [CACHE FALLBACK] {}/{} | Saving to DB only ===", currencyFrom, currencyTo);
+                    return saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo,
+                            newRate, date, "CROSS_RATE");
+                });
+    }
+
+    /**
+     * Guarda la tasa en Redis y en la base de datos.
+     */
+    private Uni<Integer> saveToRedisAndDb(
+            String cacheKey,
+            String currencyFrom,
+            String currencyTo,
+            Long countryCurrencyFromId,
+            Long countryCurrencyToId,
+            Integer currencyFromId,
+            Integer currencyToId,
+            BigDecimal rate,
+            LocalDate date) {
+
+        ExchangeRateCache cacheValue = ExchangeRateCache.builder()
+                .rate(rate)
+                .currencyFrom(currencyFrom)
+                .currencyTo(currencyTo)
+                .countryCurrencyFromId(countryCurrencyFromId)
+                .countryCurrencyToId(countryCurrencyToId)
+                .updatedAt(OffsetDateTime.now())
+                .build();
+
+        // Guardar en Redis primero (con manejo de errores silencioso)
+        Uni<Void> cacheUpdate = cachePort.set(cacheKey, cacheValue, CACHE_TTL)
+                .onFailure().invoke(error ->
+                        log.error("Failed to save to Redis cache: {}", error.getMessage())
+                )
+                .onFailure().recoverWithNull();
+
+        // Guardar en BD
+        Uni<Integer> dbSave = saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo,
+                rate, date, "CROSS_RATE");
+
+        // Ejecutar ambos, pero retornar el resultado del DB
+        return Uni.combine().all().unis(cacheUpdate, dbSave)
+                .asTuple()
+                .map(tuple -> tuple.getItem2());
+    }
+
+    /**
+     * Actualiza solo el TTL en Redis sin guardar en BD.
+     */
+    private Uni<Integer> updateCacheTTL(
+            String cacheKey,
+            String currencyFrom,
+            String currencyTo,
+            Long countryCurrencyFromId,
+            Long countryCurrencyToId,
+            BigDecimal rate) {
+
+        ExchangeRateCache cacheValue = ExchangeRateCache.builder()
+                .rate(rate)
+                .currencyFrom(currencyFrom)
+                .currencyTo(currencyTo)
+                .countryCurrencyFromId(countryCurrencyFromId)
+                .countryCurrencyToId(countryCurrencyToId)
+                .updatedAt(OffsetDateTime.now())
+                .build();
+
+        return cachePort.set(cacheKey, cacheValue, CACHE_TTL)
+                .replaceWith(0) // Retornar 0 para indicar que no se guardó en BD
+                .onFailure().invoke(error ->
+                        log.error("Failed to update cache TTL: {}", error.getMessage())
+                )
+                .onFailure().recoverWithItem(0);
+    }
+
+    /**
      * Guarda una tasa en la base de datos
      */
     private Uni<Integer> saveRate(
@@ -480,7 +642,39 @@ public class ExchangeRateService {
             String currencyFromCode,       // Código moneda origen (ej: PEN)
             Integer currencyToId,          // ID moneda destino (ej: VES)
             String currencyToCode,         // Código moneda destino (ej: VES)
+            Long countryCurrencyFromId,    // ID country_currency origen
+            Long countryCurrencyToId,      // ID country_currency destino
             List<ExchangeRate> buyRates,   // Tasas para comprar USDT con moneda origen
             List<ExchangeRate> sellRates   // Tasas para vender USDT por moneda destino
     ) {}
+
+    /**
+     * Calcula la diferencia porcentual entre dos tasas.
+     *
+     * Fórmula: ((newRate - cachedRate) / cachedRate) * 100
+     *
+     * @param newRate Nueva tasa calculada
+     * @param cachedRate Tasa almacenada en caché
+     * @return Diferencia porcentual (puede ser negativa)
+     */
+    private BigDecimal calculatePercentageChange(BigDecimal newRate, BigDecimal cachedRate) {
+        if (cachedRate.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.valueOf(100); // Cambio total si la tasa anterior era 0
+        }
+
+        return newRate.subtract(cachedRate)
+                .divide(cachedRate, 5, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+    }
+
+    /**
+     * Verifica si el cambio porcentual excede el threshold de ±0.5%.
+     *
+     * @param percentageChange Cambio porcentual calculado
+     * @return true si excede el threshold, false si está dentro del rango
+     */
+    private boolean exceedsThreshold(BigDecimal percentageChange) {
+        BigDecimal absChange = percentageChange.abs();
+        return absChange.compareTo(CHANGE_THRESHOLD_PERCENT) > 0;
+    }
 }
