@@ -1,32 +1,26 @@
 package org.walrex.infrastructure.adapter.inbound.scheduler;
 
-//import io.quarkus.runtime.StartupEvent;
-import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
-//import io.quarkus.vertx.core.runtime.context.VertxContextSafetyToggle;
-//import io.vertx.core.Context;
-//import io.vertx.core.Handler;
+import io.quarkus.scheduler.ScheduledExecution;
 import io.smallrye.mutiny.Uni;
-import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
-//import jakarta.enterprise.event.Observes;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.domain.service.ExchangeRateService;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Scheduler para actualizar tasas de cambio cada 2 minutos (TEST)
+ * Scheduler para actualizar tasas de cambio cada 3 minutos
  *
  * ARQUITECTURA:
- * - Scheduler (@Scheduled) = Trigger imperativo en worker thread
- * - vertx.runOnContext() = Ejecuta en EventLoop thread
- * - ExchangeRateService = Lógica reactiva con Hibernate Reactive
- *
- * Esta separación es CRÍTICA para que Hibernate Reactive funcione correctamente
+ * - updateExchangeRatesScheduled() se ejecuta cada 3 minutos (cron)
+ * - updateExchangeRatesInitial() se ejecuta una sola vez, 10 segundos después del inicio
+ * - Usa Scheduled.SkipPredicate para deshabilitar el scheduler inicial después de la primera ejecución
+ * - Ambos usan @Scheduled que proporciona el contexto duplicado de Vert.x requerido
+ * - ExchangeRateService contiene la lógica reactiva con Mutiny
+ * - @WithSession se maneja en los adaptadores de persistencia
  */
 @Slf4j
 @ApplicationScoped
@@ -36,41 +30,74 @@ public class ExchangeRateScheduler {
     ExchangeRateService exchangeRateService;
 
     /**
-     * Ejecuta la actualización de tasas cada 10 minutos
-     * Cron: cada 10 minutos
-     *
-     * IMPORTANTE: Scheduler solo actúa como TRIGGER
-     * La lógica reactiva se ejecuta dentro del EventLoop vía vertx.runOnContext()
+     * Predicado para deshabilitar el scheduler inicial después de la primera ejecución
      */
-    @Scheduled(cron = "0 */10 * * * ?", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    public Uni<Void> updateExchangeRates() {
-        log.info("=== Scheduler triggered at {} ===", java.time.LocalDateTime.now());
+    public static class SkipAfterFirstExecution implements Scheduled.SkipPredicate {
+        private static final AtomicBoolean hasExecuted = new AtomicBoolean(false);
 
-        return exchangeRateService.updateExchangeRates()
-                .invoke(update->{
-                    log.info("=== Exchange rates updated successfully ===");
-                    log.info("Processed {} currency pairs ", update.ratesByPair());
-                })
-                .onFailure()
-                .invoke(failure->
-                    log.error("=== Failed to update exchange rates ===", failure)
-                )
-                .replaceWithVoid();
+        @Override
+        public boolean test(ScheduledExecution execution) {
+            return shouldSkipExecution();
+        }
+
+        /**
+         * Determina si se debe saltar la ejecución del scheduler
+         *
+         * @return true si ya se ejecutó una vez (debe saltar), false si es la primera vez (debe ejecutar)
+         */
+        private boolean shouldSkipExecution() {
+            // Primera llamada: hasExecuted = false, retorna false (NO skip, ejecuta), luego se setea a true
+            // Llamadas subsiguientes: hasExecuted = true, retorna true (SÍ skip, no ejecuta)
+            return hasExecuted.getAndSet(true);
+        }
     }
 
     /**
-     * Ejecuta al inicio de la aplicación para tener tasas inmediatamente
-     * Se ejecuta 10 segundos después del arranque para permitir que los beans estén listos
+     * Ejecuta la actualización de tasas cada 10 minutos
+     *
+     * IMPORTANTE:
+     * - @Scheduled proporciona automáticamente el contexto duplicado de Vert.x
+     * - Llama al método común performUpdate()
      */
-    public Uni<Void> onStart(@Observes StartupEvent event) {
-        log.info("=== Application started - Initial exchange rate update in 10 seconds ===");
+    @Scheduled(cron = "0 */10 * * * ?", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    public Uni<Void> updateExchangeRatesScheduled() {
+        log.info("=== [SCHEDULER] Triggered at {} ===", LocalDateTime.now());
+        return performUpdate("[SCHEDULER]");
+    }
 
-        // Programar primera actualización 10 segundos después del inicio
-        return Uni.createFrom().voidItem()
-                .onItem().delayIt().by(Duration.ofSeconds(10))
-                .onItem().transformToUni(v->{
-                    log.info("=== Running initial exchange rate update ====");
-                    return updateExchangeRates();
-                });
+    /**
+     * Ejecuta la primera actualización de tasas 10 segundos después del inicio
+     *
+     * IMPORTANTE:
+     * - Se ejecuta cada 10 segundos PERO skipExecutionIf lo deshabilita después de la primera vez
+     * - SkipAfterFirstExecution retorna false la primera vez (ejecuta) y true después (no ejecuta)
+     * - @Scheduled proporciona el contexto duplicado de Vert.x que requiere Hibernate Reactive
+     * - Llama al método común performUpdate()
+     */
+    @Scheduled(every = "10s", delay = 10, delayUnit = java.util.concurrent.TimeUnit.SECONDS,
+               skipExecutionIf = SkipAfterFirstExecution.class,
+               concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    public Uni<Void> updateExchangeRatesInitial() {
+        log.info("=== [INITIAL UPDATE] Triggered at {} ===", LocalDateTime.now());
+        return performUpdate("[INITIAL UPDATE]");
+    }
+
+    /**
+     * Método común que ejecuta la actualización de tasas de cambio
+     * Llamado tanto por el scheduler periódico como por el inicial
+     *
+     * @param context Contexto de ejecución para logging ("[SCHEDULER]" o "[INITIAL UPDATE]")
+     * @return Uni<Void> para que Quarkus Scheduler se suscriba automáticamente
+     */
+    private Uni<Void> performUpdate(String context) {
+        return exchangeRateService.updateExchangeRates()
+                .invoke(update -> {
+                    log.info("=== {} Exchange rates updated successfully ===", context);
+                    log.info("=== {} Processed {} currency pairs ===", context, update.ratesByPair().size());
+                })
+                .onFailure().invoke(failure ->
+                    log.error("=== {} Failed to update exchange rates ===", context, failure)
+                )
+                .replaceWithVoid();
     }
 }

@@ -67,6 +67,12 @@ public class ExchangeRateService {
         log.info("Starting exchange rate update for remittances");
 
         return remittanceRoutePort.findAllActiveRoutes()
+                .onFailure().invoke(error ->
+                        log.error("=== [ERROR] Failed to fetch active routes ===", error)
+                )
+                .onItem().invoke(routes ->
+                        log.info("=== [ROUTES] Retrieved {} active routes from database ===", routes.size())
+                )
                 .onItem().transformToUni(routes -> {
                     if (routes.isEmpty()) {
                         log.warn("No active remittance routes found");
@@ -390,8 +396,9 @@ public class ExchangeRateService {
                     BigDecimal crossRate = avgSell.divide(avgBuy, 5, RoundingMode.HALF_UP);
 
                     // Aplicar margen de ganancia del 5%
-                    BigDecimal marginRate = crossRate.multiply(BigDecimal.valueOf(1.05))
-                            .setScale(5, RoundingMode.HALF_UP);
+                    // DIVIDIR (no multiplicar) para dar MENOS al cliente y ganar el 5%
+                    // Ejemplo: si crossRate = 14.3, marginRate = 14.3 / 1.05 = 13.62 (cliente recibe menos, nosotros ganamos)
+                    BigDecimal marginRate = crossRate.divide(BigDecimal.valueOf(1.05), 5, RoundingMode.HALF_UP);
 
                     log.info("=== [CROSS RATE] {}->{} | Without margin: {} | With 5% margin: {} ===",
                             currencyFrom, currencyTo, crossRate, marginRate);
