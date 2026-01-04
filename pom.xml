@@ -166,6 +166,11 @@
             <artifactId>quarkus-langchain4j-openai</artifactId>
             <version>1.4.2</version>
         </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-qdrant</artifactId>
+            <version>1.4.2</version>
+        </dependency>
         <!-- PostgreSQL pgvector para embeddings -->
         <dependency>
             <groupId>com.pgvector</groupId>
