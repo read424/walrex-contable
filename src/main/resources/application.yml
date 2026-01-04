@@ -158,3 +158,15 @@ quarkus:
       scope: jakarta.enterprise.context.ApplicationScoped
       read-timeout: 30000
       connect-timeout: 10000
+    # Azure Document Intelligence REST Client
+    azure-doc-intel:
+      url: https://mi-extractor-documentos.cognitiveservices.azure.com/
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 60000
+      connect-timeout: 10000
+
+# Azure Document Intelligence Configuration
+azure:
+  doc:
+    intel:
+      key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
