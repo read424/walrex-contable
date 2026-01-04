@@ -35,6 +35,24 @@ public class EmbeddingGeneratorService implements GenerateIntentEmbeddingsUseCas
     @Inject
     EmbeddingDebugLogger debugLogger;
 
+    /**
+     * Genera un embedding vectorial para un texto dado.
+     * Método público para uso general en otros servicios.
+     *
+     * @param text Texto para generar el embedding
+     * @return Uni con el array de floats del embedding
+     */
+    public Uni<float[]> generate(String text) {
+        log.debug("Generating embedding for text of length: {}", text != null ? text.length() : 0);
+
+        if (text == null || text.isBlank()) {
+            log.warn("Empty text provided, returning empty embedding");
+            return Uni.createFrom().failure(new IllegalArgumentException("Text cannot be null or empty"));
+        }
+
+        return embeddingAdapter.generateEmbedding(text);
+    }
+
     @Override
     public Uni<Integer> generateMissingEmbeddings() {
         log.info("Starting generation of missing embeddings");
