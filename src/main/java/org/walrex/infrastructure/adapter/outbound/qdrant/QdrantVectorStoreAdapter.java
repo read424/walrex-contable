@@ -16,8 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.VectorStorePort;
 import org.walrex.domain.model.AccountChunk;
 import org.walrex.domain.model.AccountSearchResult;
+import org.walrex.domain.model.AccountingBookType;
+import org.walrex.domain.model.HistoricalEntryChunk;
+import org.walrex.domain.model.HybridSearchResult;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +50,7 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
         return Uni.createFrom().item(() -> {
             // Crear metadata
             Map<String, Object> metadataMap = new HashMap<>();
+            metadataMap.put("chunk_type", "account");  // Diferenciar de journal entries
             metadataMap.put("account_id", accountChunk.getAccountId());
             metadataMap.put("code", accountChunk.getCode());
             metadataMap.put("name", accountChunk.getName());
@@ -227,5 +233,140 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
             result = new And(result, filterList.get(i));
         }
         return result;
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.upsertHistoricalEntryChunk")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = true)
+    public Uni<Void> upsertHistoricalEntryChunk(HistoricalEntryChunk chunk) {
+        log.debug("Upserting historical entry chunk for journal entry ID: {}", chunk.getJournalEntryId());
+
+        return Uni.createFrom().item(() -> {
+            // Metadata con chunk_type para diferenciación
+            Map<String, Object> metadataMap = new HashMap<>();
+            metadataMap.put("chunk_type", "journal_entry");  // KEY DIFERENCIADOR
+            metadataMap.put("journal_entry_id", chunk.getJournalEntryId());
+            metadataMap.put("entry_date", chunk.getEntryDate().toString());
+            metadataMap.put("book_type", chunk.getBookType().name());
+            metadataMap.put("description", chunk.getDescription());
+            metadataMap.put("total_debit", chunk.getTotalDebit().toString());
+            metadataMap.put("total_credit", chunk.getTotalCredit().toString());
+
+            dev.langchain4j.data.document.Metadata metadata =
+                    dev.langchain4j.data.document.Metadata.from(metadataMap);
+
+            TextSegment textSegment = TextSegment.from(chunk.getChunkText(), metadata);
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(chunk.getEmbedding());
+
+            // ID único: "je_<journal_entry_id>"
+            String pointId = "je_" + chunk.getJournalEntryId();
+            embeddingStore.add(pointId, embedding);
+
+            log.debug("Successfully upserted historical entry chunk");
+            return (Void) null;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.searchSimilarHistoricalEntries")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = false)
+    public Uni<List<HistoricalEntryChunk>> searchSimilarHistoricalEntries(float[] queryEmbedding, int limit) {
+        log.debug("Searching similar historical entries, limit: {}", limit);
+
+        return Uni.createFrom().item(() -> {
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(queryEmbedding);
+
+            // Filtrar solo journal entries
+            Filter filter = new IsEqualTo("chunk_type", "journal_entry");
+
+            EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(embedding)
+                    .maxResults(limit)
+                    .filter(filter)
+                    .build();
+
+            List<EmbeddingMatch<TextSegment>> matches =
+                    embeddingStore.search(searchRequest).matches();
+
+            List<HistoricalEntryChunk> results = matches.stream()
+                    .map(this::toHistoricalEntryChunk)
+                    .collect(Collectors.toList());
+
+            log.debug("Found {} similar historical entries", results.size());
+            return results;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.searchHybrid")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = false)
+    public Uni<HybridSearchResult> searchHybrid(float[] queryEmbedding, int accountLimit, int historicalLimit) {
+        log.debug("Performing hybrid search (accounts: {}, historical: {})", accountLimit, historicalLimit);
+
+        Uni<List<AccountSearchResult>> accountsUni = searchAccountsOnly(queryEmbedding, accountLimit);
+        Uni<List<HistoricalEntryChunk>> entriesUni = searchSimilarHistoricalEntries(queryEmbedding, historicalLimit);
+
+        return Uni.combine().all().unis(accountsUni, entriesUni)
+                .asTuple()
+                .map(tuple -> {
+                    log.debug("Hybrid search completed: {} accounts, {} historical entries",
+                            tuple.getItem1().size(), tuple.getItem2().size());
+                    return HybridSearchResult.builder()
+                            .accounts(tuple.getItem1())
+                            .historicalEntries(tuple.getItem2())
+                            .build();
+                });
+    }
+
+    /**
+     * Busca solo cuentas contables (filtra por chunk_type="account").
+     */
+    private Uni<List<AccountSearchResult>> searchAccountsOnly(float[] queryEmbedding, int limit) {
+        log.debug("Searching accounts only, limit: {}", limit);
+
+        return Uni.createFrom().item(() -> {
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(queryEmbedding);
+
+            // Filtrar solo cuentas
+            Filter filter = new IsEqualTo("chunk_type", "account");
+
+            EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(embedding)
+                    .maxResults(limit)
+                    .filter(filter)
+                    .build();
+
+            List<EmbeddingMatch<TextSegment>> matches =
+                    embeddingStore.search(searchRequest).matches();
+
+            List<AccountSearchResult> results = matches.stream()
+                    .map(this::toSearchResult)
+                    .collect(Collectors.toList());
+
+            log.debug("Found {} accounts", results.size());
+            return results;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    /**
+     * Convierte un EmbeddingMatch a HistoricalEntryChunk.
+     */
+    private HistoricalEntryChunk toHistoricalEntryChunk(EmbeddingMatch<TextSegment> match) {
+        TextSegment segment = match.embedded();
+        Map<String, Object> metadata = segment.metadata().toMap();
+
+        return HistoricalEntryChunk.builder()
+                .journalEntryId(Integer.valueOf(metadata.get("journal_entry_id").toString()))
+                .entryDate(LocalDate.parse((String) metadata.get("entry_date")))
+                .description((String) metadata.get("description"))
+                .bookType(AccountingBookType.valueOf((String) metadata.get("book_type")))
+                .chunkText(segment.text())
+                .totalDebit(new BigDecimal((String) metadata.get("total_debit")))
+                .totalCredit(new BigDecimal((String) metadata.get("total_credit")))
+                .similarityScore(match.score().floatValue())
+                .build();
     }
 }
