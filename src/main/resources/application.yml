@@ -170,3 +170,22 @@ azure:
   doc:
     intel:
       key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
+
+# Qdrant Vector Database Configuration
+quarkus:
+  langchain4j:
+    qdrant:
+      host: localhost
+      port: 6334
+      api-key: ${QDRANT_API_KEY:}
+      use-tls: false
+      collection-name: accounting_accounts
+      dimension: 1024  # mxbai-embed-large genera vectores de 1024 dimensiones
+      distance: Cosine
+
+# Embeddings Sync Configuration
+embeddings:
+  sync:
+    enabled: true
+    on-startup: true
+    batch-size: 50

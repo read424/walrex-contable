@@ -57,6 +57,12 @@ public class AccountingAccount {
     private Boolean active;
 
     /**
+     * Indica si la cuenta ya fue sincronizada con la base de datos vectorial (Qdrant)
+     * para búsqueda semántica y RAG
+     */
+    private Boolean embeddingsSynced;
+
+    /**
      * Fecha de creación del registro
      */
     private OffsetDateTime createdAt;

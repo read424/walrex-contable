@@ -75,6 +75,12 @@ public class AccountingAccountEntity extends PanacheEntityBase {
     private Boolean active;
 
     /**
+     * Indica si la cuenta ya fue sincronizada con la base de datos vectorial (Qdrant)
+     */
+    @Column(name = "embeddings_synced", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean embeddingsSynced;
+
+    /**
      * Fecha de creación del registro
      */
     @Column(name = "created_at")
