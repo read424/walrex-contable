@@ -1,0 +1,231 @@
+package org.walrex.infrastructure.adapter.outbound.qdrant;
+
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.filter.Filter;
+import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
+import dev.langchain4j.store.embedding.filter.logical.And;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import io.quarkus.runtime.Startup;
+import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
+import org.walrex.application.port.output.VectorStorePort;
+import org.walrex.domain.model.AccountChunk;
+import org.walrex.domain.model.AccountSearchResult;
+import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Adapter que implementa el puerto VectorStorePort usando Qdrant.
+ * Utiliza la librería quarkus-langchain4j-qdrant para la integración.
+ */
+@Slf4j
+@ApplicationScoped
+public class QdrantVectorStoreAdapter implements VectorStorePort {
+
+    @Inject
+    EmbeddingStore<TextSegment> embeddingStore;
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.upsertAccountEmbedding")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = true)
+    public Uni<Void> upsertAccountEmbedding(AccountChunk accountChunk) {
+        log.debug("Upserting embedding for account ID: {} ({})",
+                accountChunk.getAccountId(), accountChunk.getCode());
+
+        return Uni.createFrom().item(() -> {
+            // Crear metadata
+            Map<String, Object> metadataMap = new HashMap<>();
+            metadataMap.put("account_id", accountChunk.getAccountId());
+            metadataMap.put("code", accountChunk.getCode());
+            metadataMap.put("name", accountChunk.getName());
+            metadataMap.put("type", accountChunk.getType().name());
+            metadataMap.put("normal_side", accountChunk.getNormalSide().name());
+            metadataMap.put("active", accountChunk.getActive());
+
+            // Crear Metadata de LangChain4j
+            dev.langchain4j.data.document.Metadata metadata =
+                    dev.langchain4j.data.document.Metadata.from(metadataMap);
+
+            // Crear TextSegment con el chunk text y metadata
+            TextSegment textSegment = TextSegment.from(accountChunk.getChunkText(), metadata);
+
+            // Crear embedding de LangChain4j
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(accountChunk.getEmbedding());
+
+            // Usar account_id como ID único en Qdrant
+            String pointId = String.valueOf(accountChunk.getAccountId());
+
+            // Almacenar en Qdrant
+            embeddingStore.add(pointId, embedding);
+
+            log.debug("Successfully upserted embedding for account: {}", accountChunk.getCode());
+            return (Void) null;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.deleteAccountEmbedding")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = true)
+    public Uni<Void> deleteAccountEmbedding(Integer accountId) {
+        log.debug("Deleting embedding for account ID: {}", accountId);
+
+        return Uni.createFrom().item(() -> {
+            String pointId = String.valueOf(accountId);
+            embeddingStore.remove(pointId);
+            log.debug("Successfully deleted embedding for account ID: {}", accountId);
+            return (Void) null;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.searchSimilar")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = false)
+    public Uni<List<AccountSearchResult>> searchSimilar(float[] queryEmbedding, int limit) {
+        log.debug("Searching similar accounts, limit: {}", limit);
+
+        return Uni.createFrom().item(() -> {
+            // Crear embedding de LangChain4j
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(queryEmbedding);
+
+            // Construir request de búsqueda
+            EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(embedding)
+                    .maxResults(limit)
+                    .build();
+
+            // Ejecutar búsqueda
+            List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(searchRequest).matches();
+
+            // Convertir a AccountSearchResult
+            List<AccountSearchResult> results = matches.stream()
+                    .map(this::toSearchResult)
+                    .collect(Collectors.toList());
+
+            log.debug("Found {} similar accounts", results.size());
+            return results;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.searchSimilarWithFilters")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = false)
+    public Uni<List<AccountSearchResult>> searchSimilarWithFilters(
+            float[] queryEmbedding,
+            int limit,
+            Map<String, Object> filters) {
+        log.debug("Searching similar accounts with filters, limit: {}", limit);
+
+        return Uni.createFrom().item(() -> {
+            // Crear embedding de LangChain4j
+            dev.langchain4j.data.embedding.Embedding embedding =
+                    dev.langchain4j.data.embedding.Embedding.from(queryEmbedding);
+
+            // Construir filtros de LangChain4j
+            Filter filter = buildFilter(filters);
+
+            // Construir request de búsqueda
+            EmbeddingSearchRequest.EmbeddingSearchRequestBuilder requestBuilder =
+                    EmbeddingSearchRequest.builder()
+                            .queryEmbedding(embedding)
+                            .maxResults(limit);
+
+            if (filter != null) {
+                requestBuilder.filter(filter);
+            }
+
+            // Ejecutar búsqueda
+            List<EmbeddingMatch<TextSegment>> matches =
+                    embeddingStore.search(requestBuilder.build()).matches();
+
+            // Convertir a AccountSearchResult
+            List<AccountSearchResult> results = matches.stream()
+                    .map(this::toSearchResult)
+                    .collect(Collectors.toList());
+
+            log.debug("Found {} similar accounts with filters", results.size());
+            return results;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.collectionExists")
+    public Uni<Boolean> collectionExists() {
+        // La librería quarkus-langchain4j-qdrant maneja automáticamente la creación de la colección
+        // Por ahora, siempre retornamos true ya que la colección se crea automáticamente
+        return Uni.createFrom().item(true);
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.createCollection")
+    public Uni<Void> createCollection() {
+        // La librería quarkus-langchain4j-qdrant crea automáticamente la colección
+        // si no existe cuando se usa el EmbeddingStore
+        log.info("Collection creation is handled automatically by quarkus-langchain4j-qdrant");
+        return Uni.createFrom().voidItem();
+    }
+
+    /**
+     * Convierte un EmbeddingMatch a AccountSearchResult.
+     */
+    private AccountSearchResult toSearchResult(EmbeddingMatch<TextSegment> match) {
+        TextSegment segment = match.embedded();
+        Map<String, Object> metadata = segment.metadata().toMap();
+
+        return AccountSearchResult.builder()
+                .accountId((Integer) metadata.get("account_id"))
+                .code((String) metadata.get("code"))
+                .name((String) metadata.get("name"))
+                .type(org.walrex.domain.model.AccountType.valueOf((String) metadata.get("type")))
+                .normalSide(org.walrex.domain.model.NormalSide.valueOf((String) metadata.get("normal_side")))
+                .score(match.score().floatValue())
+                .active((Boolean) metadata.get("active"))
+                .build();
+    }
+
+    /**
+     * Construye un filtro de LangChain4j a partir de un mapa de filtros.
+     */
+    private Filter buildFilter(Map<String, Object> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return null;
+        }
+
+        List<Filter> filterList = new ArrayList<>();
+
+        for (Map.Entry<String, Object> entry : filters.entrySet()) {
+            filterList.add(new IsEqualTo(entry.getKey(), entry.getValue()));
+        }
+
+        if (filterList.isEmpty()) {
+            return null;
+        }
+
+        if (filterList.size() == 1) {
+            return filterList.get(0);
+        }
+
+        // Combinar dos filtros con AND
+        if (filterList.size() == 2) {
+            return new And(filterList.get(0), filterList.get(1));
+        }
+
+        // Combinar múltiples filtros con AND anidado
+        Filter result = new And(filterList.get(0), filterList.get(1));
+        for (int i = 2; i < filterList.size(); i++) {
+            result = new And(result, filterList.get(i));
+        }
+        return result;
+    }
+}
