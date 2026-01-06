@@ -36,27 +36,6 @@ public class JournalEntry {
     private String description;
 
     /**
-     * Reference to internal documents (null for now, future use).
-     */
-    private String reference;
-
-    /**
-     * Foreign key to document type (from document_types table).
-     * References fiscal documents like invoices, receipts, etc.
-     */
-    private Integer docTypeId;
-
-    /**
-     * Document series (e.g., "F001" for invoices).
-     */
-    private String docSerie;
-
-    /**
-     * Document number (e.g., "00001234").
-     */
-    private String docNumber;
-
-    /**
      * General operation number (correlative).
      */
     private Integer operationNumber;
