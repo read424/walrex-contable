@@ -76,6 +76,14 @@ public interface VectorStorePort {
     Uni<Void> upsertHistoricalEntryChunk(HistoricalEntryChunk chunk);
 
     /**
+     * Elimina el chunk de un asiento histórico de Qdrant.
+     *
+     * @param journalEntryId ID del asiento contable a eliminar
+     * @return Uni<Void> que completa cuando la operación finaliza
+     */
+    Uni<Void> deleteHistoricalEntryChunk(Integer journalEntryId);
+
+    /**
      * Busca asientos históricos similares por embedding.
      *
      * @param queryEmbedding Vector de búsqueda
