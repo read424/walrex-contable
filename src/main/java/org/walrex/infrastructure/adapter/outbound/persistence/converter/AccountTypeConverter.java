@@ -4,13 +4,6 @@ import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import org.walrex.domain.model.AccountType;
 
-/**
- * Convertidor JPA para mapear el tipo ENUM de PostgreSQL account_type
- * al enum Java AccountType.
- *
- * Este convertidor es necesario para trabajar con tipos ENUM nativos de PostgreSQL
- * en un contexto reactivo con Hibernate Reactive.
- */
 @Converter(autoApply = true)
 public class AccountTypeConverter implements AttributeConverter<AccountType, String> {
 
@@ -19,12 +12,12 @@ public class AccountTypeConverter implements AttributeConverter<AccountType, Str
         if (attribute == null) {
             return null;
         }
-        return attribute.name();
+        return attribute.name().toLowerCase();
     }
 
     @Override
     public AccountType convertToEntityAttribute(String dbData) {
-        if (dbData == null || dbData.isBlank()) {
+        if (dbData == null || dbData.isEmpty()) {
             return null;
         }
         return AccountType.valueOf(dbData.toUpperCase());
