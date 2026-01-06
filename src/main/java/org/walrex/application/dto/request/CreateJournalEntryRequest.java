@@ -35,31 +35,6 @@ public record CreateJournalEntryRequest(
     String description,
 
     /**
-     * Optional reference to internal documents.
-     * Can be null for now, will be used in the future.
-     */
-    @Size(max = 100, message = "Reference must not exceed 100 characters")
-    String reference,
-
-    /**
-     * Optional document type ID (from document_types table).
-     * References fiscal documents like invoices, receipts, etc.
-     */
-    Integer docTypeId,
-
-    /**
-     * Optional document series (e.g., "F001" for invoices).
-     */
-    @Size(max = 10, message = "Document series must not exceed 10 characters")
-    String docSerie,
-
-    /**
-     * Optional document number (e.g., "00001234").
-     */
-    @Size(max = 20, message = "Document number must not exceed 20 characters")
-    String docNumber,
-
-    /**
      * List of journal entry lines (details).
      * Must have at least 2 lines for a valid entry.
      */
@@ -77,24 +52,6 @@ public record CreateJournalEntryRequest(
         }
         if (description != null) {
             description = description.trim();
-        }
-        if (reference != null) {
-            reference = reference.trim();
-            if (reference.isEmpty()) {
-                reference = null;
-            }
-        }
-        if (docSerie != null) {
-            docSerie = docSerie.trim();
-            if (docSerie.isEmpty()) {
-                docSerie = null;
-            }
-        }
-        if (docNumber != null) {
-            docNumber = docNumber.trim();
-            if (docNumber.isEmpty()) {
-                docNumber = null;
-            }
         }
     }
 }

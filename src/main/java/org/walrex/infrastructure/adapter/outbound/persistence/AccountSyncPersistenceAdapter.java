@@ -30,18 +30,16 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
     public Multi<AccountingAccount> findUnsyncedAccounts() {
         log.debug("Finding unsynced accounts");
 
-        return Multi.createFrom().items(() ->
-                AccountingAccountEntity
-                        .<AccountingAccountEntity>find(
-                                "embeddings_synced = false AND is_active = true AND deleted_at IS NULL"
-                        )
-                        .list()
-                        .await().indefinitely()
-                        .stream()
-        ).onItem().transform(entity -> {
-            log.trace("Found unsynced account: {} ({})", entity.getCode(), entity.getName());
-            return mapper.toDomain(entity);
-        });
+        return AccountingAccountEntity
+                .<AccountingAccountEntity>find(
+                        "embeddingsSynced = false AND active = true AND deletedAt IS NULL"
+                )
+                .list()
+                .onItem().transformToMulti(list -> Multi.createFrom().iterable(list))
+                .onItem().transform(entity -> {
+                    log.trace("Found unsynced account: {} ({})", entity.getCode(), entity.getName());
+                    return mapper.toDomain(entity);
+                });
     }
 
     @Override
@@ -119,7 +117,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
         log.debug("Counting unsynced accounts");
 
         return AccountingAccountEntity.count(
-                "embeddings_synced = false AND is_active = true AND deleted_at IS NULL"
+                "embeddingsSynced = false AND active = true AND deletedAt IS NULL"
         ).onItem().invoke(count ->
                 log.debug("Found {} unsynced accounts", count)
         );
@@ -133,7 +131,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
 
         return Panache.withTransaction(() ->
                 AccountingAccountEntity.update(
-                        "embeddings_synced = false, updated_at = ?1 WHERE is_active = true AND deleted_at IS NULL",
+                        "embeddingsSynced = false, updatedAt = ?1 WHERE active = true AND deletedAt IS NULL",
                         java.time.OffsetDateTime.now()
                 ).onItem().invoke(count ->
                         log.info("Marked {} accounts as unsynced", count)

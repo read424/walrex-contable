@@ -48,3 +48,4 @@ nb-configuration.xml
 *.md
 !README.md
 logs/
+uploads/

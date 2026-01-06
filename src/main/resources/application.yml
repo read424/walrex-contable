@@ -151,6 +151,18 @@ quarkus:
         model-id: mxbai-embed-large
         # mxbai genera embeddings de 1024 dimensiones
 
+    # Qdrant Vector Database Configuration
+    qdrant:
+      host: localhost
+      port: 6334
+      api-key: ${QDRANT_API_KEY:}
+      use-tls: false
+      collection:
+        name: accounting_data  # Colección para accounts y journal entries
+      dimension: 1024  # mxbai-embed-large genera vectores de 1024 dimensiones
+      distance: Cosine
+
+
   # REST Client configuration for Binance P2P API
   rest-client:
     binance-p2p:
@@ -171,21 +183,29 @@ azure:
     intel:
       key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
 
-# Qdrant Vector Database Configuration
-quarkus:
-  langchain4j:
-    qdrant:
-      host: localhost
-      port: 6334
-      api-key: ${QDRANT_API_KEY:}
-      use-tls: false
-      collection-name: accounting_accounts
-      dimension: 1024  # mxbai-embed-large genera vectores de 1024 dimensiones
-      distance: Cosine
-
 # Embeddings Sync Configuration
 embeddings:
   sync:
     enabled: true
     on-startup: true
     batch-size: 50
+
+# RAG Configuration for Journal Entry Suggestions
+rag:
+  llm:
+    # Proveedor LLM por defecto: "groq" o "ollama"
+    default-provider: groq
+    # Fallback a Ollama si Groq falla
+    enable-fallback: true
+  search:
+    # Límites para búsqueda vectorial
+    account-limit: 5
+    historical-entry-limit: 3
+    # Threshold mínimo de similitud (0.0 a 1.0)
+    similarity-threshold: 0.7
+  historical:
+    # Habilitar almacenamiento automático de asientos en Qdrant
+    auto-sync-enabled: true
+    # Sincronizar asientos al crearse/modificarse
+    sync-on-create: true
+    sync-on-update: false

@@ -1,5 +1,6 @@
 package org.walrex.infrastructure.adapter.inbound.rest.resource;
 
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -16,6 +17,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.walrex.application.dto.response.EmbeddingGenerationResponse;
 import org.walrex.application.dto.response.ErrorResponse;
 import org.walrex.application.port.input.GenerateIntentEmbeddingsUseCase;
+import org.walrex.application.port.output.IntentEmbeddingOutputPort;
 
 /**
  * Endpoint administrativo para gestión de embeddings de intents
@@ -32,10 +34,16 @@ public class AdminEmbeddingResource {
     GenerateIntentEmbeddingsUseCase embeddingGenerator;
 
     @Inject
-    org.walrex.application.port.output.IntentEmbeddingOutputPort intentPersistence;
+    IntentEmbeddingOutputPort intentPersistence;
 
     @Inject
     org.walrex.infrastructure.adapter.outbound.logging.EmbeddingDebugLogger debugLogger;
+
+    @Inject
+    org.walrex.application.port.input.SyncHistoricalEntriesUseCase historicalEntriesSyncUseCase;
+
+    @Inject
+    org.walrex.application.port.input.SyncAccountEmbeddingsUseCase syncAccountEmbeddingsUseCase;
 
     @POST
     @Path("/generate")
@@ -179,6 +187,270 @@ public class AdminEmbeddingResource {
                             500,
                             "Internal Server Error",
                             "Error al generar embedding: " + error.getMessage()
+                    );
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(errorResponse)
+                            .build();
+                });
+    }
+
+    // ==================== Accounting Accounts Sync ====================
+
+    @POST
+    @WithSession
+    @Path("/sync-accounts")
+    @Operation(
+            summary = "Sincronizar cuentas contables a Qdrant",
+            description = """
+                    Sincroniza las cuentas contables que aún no han sido procesadas a Qdrant.
+
+                    Genera embeddings del catálogo de cuentas (Chart of Accounts) para que el RAG
+                    pueda sugerir cuentas contables apropiadas cuando se procesen documentos.
+
+                    Solo procesa cuentas que no han sido sincronizadas previamente.
+                    """
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Cuentas sincronizadas exitosamente",
+                    content = @Content(schema = @Schema(implementation = org.walrex.domain.model.SyncResult.class))
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error al sincronizar cuentas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    public Uni<Response> syncUnsyncedAccounts() {
+        log.info("Admin request: Sync unsynced accounting accounts to Qdrant");
+
+        return syncAccountEmbeddingsUseCase.syncUnsyncedAccounts()
+                .map(syncResult -> Response.ok(syncResult).build())
+                .onFailure().recoverWithItem(error -> {
+                    log.error("Error syncing accounting accounts", error);
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            500,
+                            "Internal Server Error",
+                            "Error al sincronizar cuentas contables: " + error.getMessage()
+                    );
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(errorResponse)
+                            .build();
+                });
+    }
+
+    @POST
+    @WithSession
+    @Path("/sync-account/{accountId}")
+    @Operation(
+            summary = "Sincronizar una cuenta contable específica",
+            description = "Sincroniza una cuenta contable específica a Qdrant por su ID"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Cuenta sincronizada exitosamente"
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "Cuenta no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error al sincronizar cuenta",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    public Uni<Response> syncAccount(@PathParam("accountId") Integer accountId) {
+        log.info("Admin request: Sync accounting account: {}", accountId);
+        long startTime = System.currentTimeMillis();
+
+        return syncAccountEmbeddingsUseCase.syncAccount(accountId)
+                .map(success -> {
+                    long duration = System.currentTimeMillis() - startTime;
+                    EmbeddingGenerationResponse response = new EmbeddingGenerationResponse(
+                            1,
+                            String.format("Successfully synced accounting account %d to Qdrant", accountId),
+                            duration
+                    );
+                    return Response.ok(response).build();
+                })
+                .onFailure(IllegalArgumentException.class).recoverWithItem(error -> {
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            404,
+                            "Not Found",
+                            error.getMessage()
+                    );
+                    return Response.status(Response.Status.NOT_FOUND)
+                            .entity(errorResponse)
+                            .build();
+                })
+                .onFailure().recoverWithItem(error -> {
+                    log.error("Error syncing accounting account: {}", accountId, error);
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            500,
+                            "Internal Server Error",
+                            "Error al sincronizar cuenta: " + error.getMessage()
+                    );
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(errorResponse)
+                            .build();
+                });
+    }
+
+    @POST
+    @WithSession
+    @Path("/resync-all-accounts")
+    @Operation(
+            summary = "Re-sincronizar todas las cuentas contables",
+            description = """
+                    Fuerza la re-sincronización de TODAS las cuentas contables activas a Qdrant.
+
+                    Útil cuando:
+                    - Se actualiza el modelo de embeddings
+                    - Se modifican múltiples cuentas manualmente en la DB
+                    - Se necesita regenerar todos los embeddings del catálogo de cuentas
+
+                    ADVERTENCIA: Este proceso puede tardar si hay muchas cuentas.
+                    """
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Cuentas re-sincronizadas exitosamente",
+                    content = @Content(schema = @Schema(implementation = org.walrex.domain.model.SyncResult.class))
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error al re-sincronizar cuentas",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    public Uni<Response> forceResyncAllAccounts() {
+        log.info("Admin request: Force resync all accounting accounts to Qdrant");
+
+        return syncAccountEmbeddingsUseCase.forceResyncAll()
+                .map(syncResult -> Response.ok(syncResult).build())
+                .onFailure().recoverWithItem(error -> {
+                    log.error("Error resyncing all accounting accounts", error);
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            500,
+                            "Internal Server Error",
+                            "Error al re-sincronizar todas las cuentas: " + error.getMessage()
+                    );
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(errorResponse)
+                            .build();
+                });
+    }
+
+    // ==================== Historical Journal Entries Sync ====================
+
+    @POST
+    @Path("/sync-historical-entries")
+    @Operation(
+            summary = "Sincronizar asientos históricos a Qdrant",
+            description = """
+                    Sincroniza TODOS los asientos contables existentes a Qdrant para que el RAG
+                    pueda aprender de registros históricos y mejorar las sugerencias futuras.
+
+                    Ejecuta esto una vez después de instalar el sistema o cuando quieras
+                    asegurarte de que todos los asientos están sincronizados.
+                    """
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Asientos sincronizados exitosamente",
+                    content = @Content(schema = @Schema(implementation = EmbeddingGenerationResponse.class))
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error al sincronizar asientos",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    public Uni<Response> syncAllHistoricalEntries() {
+        log.info("Admin request: Sync all historical journal entries to Qdrant");
+        long startTime = System.currentTimeMillis();
+
+        return historicalEntriesSyncUseCase.syncAllEntries()
+                .map(count -> {
+                    long duration = System.currentTimeMillis() - startTime;
+                    EmbeddingGenerationResponse response = new EmbeddingGenerationResponse(
+                            count,
+                            String.format("Successfully synced %d historical journal entries to Qdrant", count),
+                            duration
+                    );
+                    return Response.ok(response).build();
+                })
+                .onFailure().recoverWithItem(error -> {
+                    log.error("Error syncing historical entries", error);
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            500,
+                            "Internal Server Error",
+                            "Error al sincronizar asientos históricos: " + error.getMessage()
+                    );
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                            .entity(errorResponse)
+                            .build();
+                });
+    }
+
+    @POST
+    @Path("/sync-historical-entry/{entryId}")
+    @Operation(
+            summary = "Sincronizar un asiento específico a Qdrant",
+            description = "Sincroniza un asiento contable específico a Qdrant por su ID"
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Asiento sincronizado exitosamente"
+            ),
+            @APIResponse(
+                    responseCode = "404",
+                    description = "Asiento no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error al sincronizar asiento",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    public Uni<Response> syncHistoricalEntry(@PathParam("entryId") Integer entryId) {
+        log.info("Admin request: Sync historical journal entry: {}", entryId);
+        long startTime = System.currentTimeMillis();
+
+        return historicalEntriesSyncUseCase.syncEntry(entryId)
+                .map(success -> {
+                    long duration = System.currentTimeMillis() - startTime;
+                    EmbeddingGenerationResponse response = new EmbeddingGenerationResponse(
+                            1,
+                            String.format("Successfully synced journal entry %d to Qdrant", entryId),
+                            duration
+                    );
+                    return Response.ok(response).build();
+                })
+                .onFailure(IllegalArgumentException.class).recoverWithItem(error -> {
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            404,
+                            "Not Found",
+                            error.getMessage()
+                    );
+                    return Response.status(Response.Status.NOT_FOUND)
+                            .entity(errorResponse)
+                            .build();
+                })
+                .onFailure().recoverWithItem(error -> {
+                    log.error("Error syncing journal entry: {}", entryId, error);
+                    ErrorResponse errorResponse = new ErrorResponse(
+                            500,
+                            "Internal Server Error",
+                            "Error al sincronizar asiento: " + error.getMessage()
                     );
                     return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                             .entity(errorResponse)
