@@ -3,6 +3,7 @@ package org.walrex.domain.service;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.vertx.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,9 @@ public class AccountEmbeddingSyncService implements SyncAccountEmbeddingsUseCase
 
     @Inject
     VectorStorePort vectorStorePort;
+
+    @Inject
+    Vertx vertx;
 
     @ConfigProperty(name = "embeddings.sync.batch-size", defaultValue = "50")
     Integer batchSize;
@@ -149,6 +153,8 @@ public class AccountEmbeddingSyncService implements SyncAccountEmbeddingsUseCase
 
         return chunkingService.createAccountChunk(account)
                 .chain(chunk -> vectorStorePort.upsertAccountEmbedding(chunk))
+                // CRÍTICO: Volver al event-loop de Vert.x antes de operación DB con Hibernate Reactive
+                .emitOn(command -> vertx.getOrCreateContext().runOnContext(v -> command.run()))
                 .call(() -> accountSyncQueryPort.markAsSynced(account.getId()))
                 .onFailure().invoke(throwable ->
                         log.error("Error syncing account {}: {}", account.getCode(), throwable.getMessage())
