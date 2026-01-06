@@ -22,11 +22,13 @@ import org.walrex.domain.model.HybridSearchResult;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -56,7 +58,7 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
             metadataMap.put("name", accountChunk.getName());
             metadataMap.put("type", accountChunk.getType().name());
             metadataMap.put("normal_side", accountChunk.getNormalSide().name());
-            metadataMap.put("active", accountChunk.getActive());
+            metadataMap.put("active", String.valueOf(accountChunk.getActive()));  // Boolean -> String
 
             // Crear Metadata de LangChain4j
             dev.langchain4j.data.document.Metadata metadata =
@@ -69,10 +71,13 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
             dev.langchain4j.data.embedding.Embedding embedding =
                     dev.langchain4j.data.embedding.Embedding.from(accountChunk.getEmbedding());
 
-            // Usar account_id como ID único en Qdrant
-            String pointId = String.valueOf(accountChunk.getAccountId());
+            // Generar UUID determinístico a partir del account_id
+            // Esto permite regenerar el mismo UUID para la misma cuenta
+            String namespace = "account-";
+            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + accountChunk.getAccountId()).getBytes(StandardCharsets.UTF_8));
+            String pointId = pointUuid.toString();
 
-            // Almacenar en Qdrant
+            // Almacenar en Qdrant (el metadata ya está en el embedding store internamente)
             embeddingStore.add(pointId, embedding);
 
             log.debug("Successfully upserted embedding for account: {}", accountChunk.getCode());
@@ -87,7 +92,10 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
         log.debug("Deleting embedding for account ID: {}", accountId);
 
         return Uni.createFrom().item(() -> {
-            String pointId = String.valueOf(accountId);
+            // Regenerar el mismo UUID determinístico
+            String namespace = "account-";
+            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + accountId).getBytes(StandardCharsets.UTF_8));
+            String pointId = pointUuid.toString();
             embeddingStore.remove(pointId);
             log.debug("Successfully deleted embedding for account ID: {}", accountId);
             return (Void) null;
@@ -259,11 +267,30 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
             dev.langchain4j.data.embedding.Embedding embedding =
                     dev.langchain4j.data.embedding.Embedding.from(chunk.getEmbedding());
 
-            // ID único: "je_<journal_entry_id>"
-            String pointId = "je_" + chunk.getJournalEntryId();
+            // Generar UUID determinístico para journal entry
+            String namespace = "journal-entry-";
+            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + chunk.getJournalEntryId()).getBytes(StandardCharsets.UTF_8));
+            String pointId = pointUuid.toString();
             embeddingStore.add(pointId, embedding);
 
             log.debug("Successfully upserted historical entry chunk");
+            return (Void) null;
+        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+    }
+
+    @Override
+    @WithSpan("QdrantVectorStoreAdapter.deleteHistoricalEntryChunk")
+    @LogExecutionTime(value = LogExecutionTime.LogLevel.DEBUG, logParameters = true)
+    public Uni<Void> deleteHistoricalEntryChunk(Integer journalEntryId) {
+        log.debug("Deleting historical entry chunk for journal entry ID: {}", journalEntryId);
+
+        return Uni.createFrom().item(() -> {
+            // Regenerar el mismo UUID determinístico
+            String namespace = "journal-entry-";
+            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + journalEntryId).getBytes(StandardCharsets.UTF_8));
+            String pointId = pointUuid.toString();
+            embeddingStore.remove(pointId);
+            log.debug("Successfully deleted historical entry chunk for journal entry ID: {}", journalEntryId);
             return (Void) null;
         }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
     }
