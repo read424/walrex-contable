@@ -37,8 +37,15 @@ public class DocumentProcessorService {
         log.debug("Processing document: {}", document.name());
 
         return Uni.createFrom().item(() -> {
+                    // Remove Data URL prefix if present (e.g., "data:image/jpeg;base64,")
+                    String base64Content = document.base64();
+                    if (base64Content.contains(",")) {
+                        // Extract only the base64 part after the comma
+                        base64Content = base64Content.substring(base64Content.indexOf(",") + 1);
+                    }
+
                     // Decode base64
-                    byte[] fileBytes = Base64.getDecoder().decode(document.base64());
+                    byte[] fileBytes = Base64.getDecoder().decode(base64Content);
                     return new ByteArrayInputStream(fileBytes);
                 })
                 // Store file in filesystem
