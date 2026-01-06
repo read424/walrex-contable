@@ -5,6 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.walrex.domain.model.AccountType;
 import org.walrex.domain.model.NormalSide;
+import org.walrex.infrastructure.adapter.outbound.listener.AccountEntityListener;
+import org.walrex.infrastructure.adapter.outbound.persistence.converter.AccountTypeConverter;
+import org.walrex.infrastructure.adapter.outbound.persistence.converter.NormalSideConverter;
 
 import java.time.OffsetDateTime;
 
@@ -31,6 +34,7 @@ import java.time.OffsetDateTime;
         @UniqueConstraint(name = "accounts_code_key", columnNames = { "code" }),
         @UniqueConstraint(name = "accounts_name_key", columnNames = { "name", "code" })
 })
+@EntityListeners(AccountEntityListener.class)
 public class AccountingAccountEntity extends PanacheEntityBase {
 
     /**
@@ -54,16 +58,16 @@ public class AccountingAccountEntity extends PanacheEntityBase {
 
     /**
      * Tipo contable de la cuenta
-     * Se almacena como string en la DB usando el enum PostgreSQL account_type
-     * El convertidor AccountTypeConverter se aplica automáticamente
+     * Se almacena como string en la DB usando el enum PostgreSQL account_type.
+     * La conversión es manejada por {@link AccountTypeConverter}.
      */
     @Column(name = "type", nullable = false)
     private AccountType type;
 
     /**
      * Lado normal de la cuenta (DEBIT o CREDIT)
-     * Se almacena como string en la DB usando el enum PostgreSQL normal_side
-     * El convertidor NormalSideConverter se aplica automáticamente
+     * Se almacena como string en la DB usando el enum PostgreSQL normal_side.
+     * La conversión es manejada por {@link NormalSideConverter}.
      */
     @Column(name = "normal_side", nullable = false)
     private NormalSide normalSide;
