@@ -166,4 +166,34 @@ public class JournalEntryRouter {
     public Uni<Void> create(RoutingContext rc) {
         return journalEntryHandler.create(rc);
     }
+
+    /**
+     * GET /api/v1/journal-entries - List journal entries with pagination
+     */
+    @Route(path = "", methods = Route.HttpMethod.GET)
+    @Operation(
+            summary = "Listar asientos contables",
+            description = "Obtiene una lista paginada de asientos contables con filtros opcionales. " +
+                    "Soporta filtros por año, mes, tipo de libro y búsqueda en descripción."
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Lista de asientos contables obtenida exitosamente",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "400",
+                    description = "Parámetros inválidos",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> list(RoutingContext rc) {
+        return journalEntryHandler.list(rc);
+    }
 }
