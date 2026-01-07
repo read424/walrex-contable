@@ -44,8 +44,7 @@ public record JournalEntryLineRequest(
      * Optional list of documents to attach to this line.
      * Documents are uploaded as base64-encoded strings.
      */
-    @Valid
-    List<DocumentUploadRequest> documents
+    List<@Valid DocumentUploadRequest> documents
 ) {
     /**
      * Compact constructor for normalization.
