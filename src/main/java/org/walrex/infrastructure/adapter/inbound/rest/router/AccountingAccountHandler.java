@@ -69,33 +69,28 @@ public class AccountingAccountHandler {
      */
     @WithTransaction
     public Uni<Void> create(RoutingContext rc) {
-        try {
-            CreateAccountingAccountRequest request = rc.body().asPojo(CreateAccountingAccountRequest.class);
+        CreateAccountingAccountRequest request = rc.body().asPojo(CreateAccountingAccountRequest.class);
 
-            // Validate the request
-            if (!validateRequest(rc, request)) {
-                return Uni.createFrom().voidItem();
-            }
-
-            // Map request to domain model
-            AccountingAccount accountingAccount = accountRequestMapper.toModel(request);
-
-            return createAccountUseCase.execute(accountingAccount)
-                    .onItem().invoke(accountDomain -> {
-                        AccountingAccountResponse response = accountDtoMapper.toResponse(accountDomain);
-                        String location = rc.request().absoluteURI() + "/" + response.id();
-                        rc.response()
-                                .setStatusCode(HttpResponseStatus.CREATED.code())
-                                .putHeader("Content-Type", "application/json")
-                                .putHeader("Location", location)
-                                .end(Json.encode(response));
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
-        } catch (Exception e) {
-            handleBadRequest(rc, "Invalid request body: " + e.getMessage());
+        // Validate the request
+        if (!validateRequest(rc, request)) {
             return Uni.createFrom().voidItem();
         }
+
+        // Map request to domain model
+        AccountingAccount accountingAccount = accountRequestMapper.toModel(request);
+
+        return createAccountUseCase.execute(accountingAccount)
+                .onItem().invoke(accountDomain -> {
+                    AccountingAccountResponse response = accountDtoMapper.toResponse(accountDomain);
+                    String location = rc.request().absoluteURI() + "/" + response.id();
+                    rc.response()
+                            .setStatusCode(HttpResponseStatus.CREATED.code())
+                            .putHeader("Content-Type", "application/json")
+                            .putHeader("Location", location)
+                            .end(Json.encode(response));
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -103,54 +98,49 @@ public class AccountingAccountHandler {
      */
     @WithSession
     public Uni<Void> list(RoutingContext rc) {
-        try {
-            // Parse query parameters
-            // Frontend sends 1-based pages (page 1 is first), convert to 0-based for backend
-            int page = Math.max(0, getQueryParamAsInt(rc, "page", 1) - 1);
-            int size = getQueryParamAsInt(rc, "size", 20);
-            String sortBy = rc.queryParams().get("sortBy");
-            String sortDirection = rc.queryParams().get("sortDirection");
-            String search = rc.queryParams().get("search");
-            String type = rc.queryParams().get("type");
-            String normalSide = rc.queryParams().get("normalSide");
-            String active = rc.queryParams().get("active");
+        // Parse query parameters
+        // Frontend sends 1-based pages (page 1 is first), convert to 0-based for backend
+        int page = Math.max(0, getQueryParamAsInt(rc, "page", 1) - 1);
+        int size = getQueryParamAsInt(rc, "size", 20);
+        String sortBy = rc.queryParams().get("sortBy");
+        String sortDirection = rc.queryParams().get("sortDirection");
+        String search = rc.queryParams().get("search");
+        String type = rc.queryParams().get("type");
+        String normalSide = rc.queryParams().get("normalSide");
+        String active = rc.queryParams().get("active");
 
-            // Build filter
-            AccountingAccountFilter filter = AccountingAccountFilter.builder()
-                    .search(search)
-                    .type(type)
-                    .normalSide(normalSide)
-                    .active(active)
-                    .includeDeleted("0")
-                    .build();
+        // Build filter
+        AccountingAccountFilter filter = AccountingAccountFilter.builder()
+                .search(search)
+                .type(type)
+                .normalSide(normalSide)
+                .active(active)
+                .includeDeleted("0")
+                .build();
 
-            // Build page request
-            PageRequest.SortDirection direction = sortDirection != null
-                    ? PageRequest.SortDirection.fromString(sortDirection)
-                    : PageRequest.SortDirection.ASCENDING;
+        // Build page request
+        PageRequest.SortDirection direction = sortDirection != null
+                ? PageRequest.SortDirection.fromString(sortDirection)
+                : PageRequest.SortDirection.ASCENDING;
 
-            PageRequest.PageRequestBuilder pageRequestBuilder = PageRequest.builder()
-                    .page(page)
-                    .size(size)
-                    .sortDirection(direction);
+        PageRequest.PageRequestBuilder pageRequestBuilder = PageRequest.builder()
+                .page(page)
+                .size(size)
+                .sortDirection(direction);
 
-            if (sortBy != null && !sortBy.isBlank()) {
-                pageRequestBuilder.sortBy(sortBy);
-            }
-
-            PageRequest pageRequest = pageRequestBuilder.build();
-
-            // Execute use case
-            return listAccountsUseCase.execute(pageRequest, filter)
-                    .onItem().invoke(pagedResponse -> {
-                        sendJson(rc, HttpResponseStatus.OK, pagedResponse);
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
-        } catch (Exception e) {
-            handleBadRequest(rc, "Invalid query parameters: " + e.getMessage());
-            return Uni.createFrom().voidItem();
+        if (sortBy != null && !sortBy.isBlank()) {
+            pageRequestBuilder.sortBy(sortBy);
         }
+
+        PageRequest pageRequest = pageRequestBuilder.build();
+
+        // Execute use case
+        return listAccountsUseCase.execute(pageRequest, filter)
+                .onItem().invoke(pagedResponse -> {
+                    sendJson(rc, HttpResponseStatus.OK, pagedResponse);
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -158,30 +148,25 @@ public class AccountingAccountHandler {
      */
     @WithSession
     public Uni<Void> findAll(RoutingContext rc) {
-        try {
-            // Parse query parameters
-            String search = rc.queryParams().get("search");
-            String type = rc.queryParams().get("type");
-            String active = rc.queryParams().get("active");
+        // Parse query parameters
+        String search = rc.queryParams().get("search");
+        String type = rc.queryParams().get("type");
+        String active = rc.queryParams().get("active");
 
-            // Build filter (por defecto solo cuentas activas)
-            AccountingAccountFilter filter = AccountingAccountFilter.builder()
-                    .search(search)
-                    .type(type)
-                    .active(active != null ? active : "1")
-                    .build();
+        // Build filter (por defecto solo cuentas activas)
+        AccountingAccountFilter filter = AccountingAccountFilter.builder()
+                .search(search)
+                .type(type)
+                .active(active != null ? active : "1")
+                .build();
 
-            // Execute use case
-            return listAccountsUseCase.findAll(filter)
-                    .onItem().invoke(accountingAccounts -> {
-                        sendJson(rc, HttpResponseStatus.OK, accountingAccounts);
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
-        } catch (Exception e) {
-            handleBadRequest(rc, "Invalid query parameters: " + e.getMessage());
-            return Uni.createFrom().voidItem();
-        }
+        // Execute use case
+        return listAccountsUseCase.findAll(filter)
+                .onItem().invoke(accountingAccounts -> {
+                    sendJson(rc, HttpResponseStatus.OK, accountingAccounts);
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -189,21 +174,22 @@ public class AccountingAccountHandler {
      */
     @WithSession
     public Uni<Void> getById(RoutingContext rc) {
+        String idParam = rc.pathParam("id");
+        Integer id;
         try {
-            String idParam = rc.pathParam("id");
-            Integer id = Integer.parseInt(idParam);
-
-            return getAccountUseCase.findById(id)
-                    .onItem().invoke(accountingAccount -> {
-                        AccountingAccountResponse response = accountDtoMapper.toResponse(accountingAccount);
-                        sendJson(rc, HttpResponseStatus.OK, response);
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
+            id = Integer.parseInt(idParam);
         } catch (NumberFormatException e) {
             handleBadRequest(rc, "Invalid ID format. ID must be a number.");
             return Uni.createFrom().voidItem();
         }
+
+        return getAccountUseCase.findById(id)
+                .onItem().invoke(accountingAccount -> {
+                    AccountingAccountResponse response = accountDtoMapper.toResponse(accountingAccount);
+                    sendJson(rc, HttpResponseStatus.OK, response);
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -211,27 +197,12 @@ public class AccountingAccountHandler {
      */
     @WithTransaction
     public Uni<Void> update(RoutingContext rc) {
+        Integer id;
+        UpdateAccountingAccountRequest request;
         try {
             String idParam = rc.pathParam("id");
-            Integer id = Integer.parseInt(idParam);
-
-            UpdateAccountingAccountRequest request = rc.body().asPojo(UpdateAccountingAccountRequest.class);
-
-            // Validate the request
-            if (!validateRequest(rc, request)) {
-                return Uni.createFrom().voidItem();
-            }
-
-            // Map request to domain model
-            AccountingAccount accountingAccount = accountRequestMapper.toModel(request);
-
-            return updateAccountUseCase.execute(id, accountingAccount)
-                    .onItem().invoke(updatedAccountingAccount -> {
-                        AccountingAccountResponse response = accountDtoMapper.toResponse(updatedAccountingAccount);
-                        sendJson(rc, HttpResponseStatus.OK, response);
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
+            id = Integer.parseInt(idParam);
+            request = rc.body().asPojo(UpdateAccountingAccountRequest.class);
         } catch (NumberFormatException e) {
             handleBadRequest(rc, "Invalid ID format. ID must be a number.");
             return Uni.createFrom().voidItem();
@@ -239,6 +210,23 @@ public class AccountingAccountHandler {
             handleBadRequest(rc, "Invalid request body: " + e.getMessage());
             return Uni.createFrom().voidItem();
         }
+
+
+        // Validate the request
+        if (!validateRequest(rc, request)) {
+            return Uni.createFrom().voidItem();
+        }
+
+        // Map request to domain model
+        AccountingAccount accountingAccount = accountRequestMapper.toModel(request);
+
+        return updateAccountUseCase.execute(id, accountingAccount)
+                .onItem().invoke(updatedAccountingAccount -> {
+                    AccountingAccountResponse response = accountDtoMapper.toResponse(updatedAccountingAccount);
+                    sendJson(rc, HttpResponseStatus.OK, response);
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -246,26 +234,27 @@ public class AccountingAccountHandler {
      */
     @WithTransaction
     public Uni<Void> delete(RoutingContext rc) {
+        Integer id;
         try {
             String idParam = rc.pathParam("id");
-            Integer id = Integer.parseInt(idParam);
-
-            return deleteAccountUseCase.execute(id)
-                    .onItem().invoke(deleted -> {
-                        if (deleted) {
-                            rc.response()
-                                    .setStatusCode(HttpResponseStatus.NO_CONTENT.code())
-                                    .end();
-                        } else {
-                            handleNotFound(rc, "AccountingAccount with id " + id + " not found");
-                        }
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
+            id = Integer.parseInt(idParam);
         } catch (NumberFormatException e) {
             handleBadRequest(rc, "Invalid ID format. ID must be a number.");
             return Uni.createFrom().voidItem();
         }
+
+        return deleteAccountUseCase.execute(id)
+                .onItem().invoke(deleted -> {
+                    if (deleted) {
+                        rc.response()
+                                .setStatusCode(HttpResponseStatus.NO_CONTENT.code())
+                                .end();
+                    } else {
+                        handleNotFound(rc, "AccountingAccount with id " + id + " not found");
+                    }
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**
@@ -273,27 +262,28 @@ public class AccountingAccountHandler {
      */
     @WithTransaction
     public Uni<Void> restore(RoutingContext rc) {
+        Integer id;
         try {
             String idParam = rc.pathParam("id");
-            Integer id = Integer.parseInt(idParam);
-
-            return deleteAccountUseCase.restore(id)
-                    .onItem().invoke(restored -> {
-                        if (restored) {
-                            JsonObject response = new JsonObject()
-                                    .put("message", "AccountingAccount restored successfully")
-                                    .put("id", id);
-                            sendJson(rc, HttpResponseStatus.OK, response);
-                        } else {
-                            handleNotFound(rc, "AccountingAccount with id " + id + " not found or was not deleted");
-                        }
-                    })
-                    .onFailure().invoke(error -> handleError(rc, error))
-                    .replaceWithVoid();
+            id = Integer.parseInt(idParam);
         } catch (NumberFormatException e) {
             handleBadRequest(rc, "Invalid ID format. ID must be a number.");
             return Uni.createFrom().voidItem();
         }
+
+        return deleteAccountUseCase.restore(id)
+                .onItem().invoke(restored -> {
+                    if (restored) {
+                        JsonObject response = new JsonObject()
+                                .put("message", "AccountingAccount restored successfully")
+                                .put("id", id);
+                        sendJson(rc, HttpResponseStatus.OK, response);
+                    } else {
+                        handleNotFound(rc, "AccountingAccount with id " + id + " not found or was not deleted");
+                    }
+                })
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     // ==================== Métodos de Utilidad ====================
@@ -345,6 +335,10 @@ public class AccountingAccountHandler {
      * Maneja errores de validación (400 Bad Request).
      */
     private void handleBadRequest(RoutingContext rc, String message) {
+        if (rc.response().ended()) {
+            log.warn("Response already sent, skipping bad request handling for: {}", message);
+            return;
+        }
         log.warn("Bad request: {}", message);
         JsonObject error = new JsonObject()
                 .put("error", "Bad Request")
@@ -361,6 +355,10 @@ public class AccountingAccountHandler {
      * Maneja errores de recurso no encontrado (404 Not Found).
      */
     private void handleNotFound(RoutingContext rc, String message) {
+        if (rc.response().ended()) {
+            log.warn("Response already sent, skipping not found handling for: {}", message);
+            return;
+        }
         log.warn("Not found: {}", message);
         JsonObject error = new JsonObject()
                 .put("error", "Not Found")
@@ -377,6 +375,10 @@ public class AccountingAccountHandler {
      * Maneja errores de conflicto (409 Conflict).
      */
     private void handleConflict(RoutingContext rc, String message) {
+        if (rc.response().ended()) {
+            log.warn("Response already sent, skipping conflict handling for: {}", message);
+            return;
+        }
         log.warn("Conflict: {}", message);
         JsonObject error = new JsonObject()
                 .put("error", "Conflict")
@@ -394,7 +396,10 @@ public class AccountingAccountHandler {
      */
     private void handleError(RoutingContext rc, Throwable error) {
         log.error("Error handling request", error);
-
+        if (rc.response().ended()) {
+            log.warn("Response already sent, skipping error handling for: {}", error.getMessage());
+            return;
+        }
         if (error instanceof AccountingAccountNotFoundException) {
             handleNotFound(rc, error.getMessage());
         } else if (error instanceof DuplicateAccountingAccountException) {
