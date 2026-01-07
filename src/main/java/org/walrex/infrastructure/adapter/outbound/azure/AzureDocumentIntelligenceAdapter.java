@@ -28,7 +28,7 @@ import java.time.Duration;
 public class AzureDocumentIntelligenceAdapter implements DocumentIntelligencePort {
 
     private static final String MODEL_ID = "prebuilt-invoice";
-    private static final String API_VERSION = "2024-02-29-preview";
+    private static final String API_VERSION = "2023-07-31";
     private static final int MAX_POLLING_ATTEMPTS = 30;
     private static final Duration POLLING_INTERVAL = Duration.ofSeconds(2);
 
@@ -64,10 +64,11 @@ public class AzureDocumentIntelligenceAdapter implements DocumentIntelligencePor
 
     /**
      * Inicia el análisis del documento en Azure.
-     * Retorna la URL de operación para hacer polling del resultado.
+     * Retorna el resultId extraído del header Operation-Location.
      */
     private Uni<String> initiateAnalysis(byte[] documentBytes, String contentType) {
-        log.debug("Initiating document analysis...");
+        log.info("Initiating document analysis with model: {}, API version: {}, contentType: {}",
+                MODEL_ID, API_VERSION, contentType);
 
         return azureRestClient.analyzeDocument(
                         MODEL_ID,
@@ -77,28 +78,78 @@ public class AzureDocumentIntelligenceAdapter implements DocumentIntelligencePor
                         documentBytes
                 )
                 .onItem().transformToUni(response -> {
-                    // En una implementación real, extraeríamos el Operation-Location header
-                    // Por ahora, vamos a simular que obtenemos una URL de operación
-                    // TODO: Implementar extracción del header Operation-Location
-                    String operationLocation = "operation-url-from-header";
+                    // Extraer el header Operation-Location
+                    String operationLocation = response.getHeaderString("Operation-Location");
+
+                    if (operationLocation == null || operationLocation.isEmpty()) {
+                        log.error("Operation-Location header not found in Azure response");
+                        return Uni.createFrom().failure(
+                                new DocumentIntelligenceApiException(
+                                        "Operation-Location header missing from Azure response"
+                                )
+                        );
+                    }
+
                     log.debug("Analysis initiated. Operation location: {}", operationLocation);
-                    return Uni.createFrom().item(operationLocation);
+
+                    // Extraer el resultId de la URL
+                    // Formato: https://.../formrecognizer/documentModels/{modelId}/analyzeResults/{resultId}?...
+                    String resultId = extractResultId(operationLocation);
+
+                    if (resultId == null || resultId.isEmpty()) {
+                        log.error("Failed to extract resultId from Operation-Location: {}", operationLocation);
+                        return Uni.createFrom().failure(
+                                new DocumentIntelligenceApiException(
+                                        "Failed to extract resultId from Operation-Location"
+                                )
+                        );
+                    }
+
+                    log.debug("Extracted resultId: {}", resultId);
+                    return Uni.createFrom().item(resultId);
                 })
                 .onFailure(WebApplicationException.class).transform(this::handleWebApplicationException);
     }
 
     /**
+     * Extrae el resultId del header Operation-Location.
+     * Formato esperado: https://.../formrecognizer/documentModels/{modelId}/analyzeResults/{resultId}?api-version=...
+     */
+    private String extractResultId(String operationLocation) {
+        try {
+            // Buscar "analyzeResults/" y extraer el resultId
+            int startIndex = operationLocation.indexOf("/analyzeResults/");
+            if (startIndex == -1) {
+                return null;
+            }
+
+            startIndex += "/analyzeResults/".length();
+
+            // El resultId va hasta el siguiente '?' o hasta el final
+            int endIndex = operationLocation.indexOf('?', startIndex);
+            if (endIndex == -1) {
+                endIndex = operationLocation.length();
+            }
+
+            return operationLocation.substring(startIndex, endIndex);
+        } catch (Exception e) {
+            log.error("Error extracting resultId from Operation-Location", e);
+            return null;
+        }
+    }
+
+    /**
      * Hace polling del resultado del análisis hasta que esté completo.
      */
-    private Uni<AzureAnalyzeResponse> pollForResult(String operationLocation) {
-        log.debug("Starting polling for analysis result...");
-        return pollAttemptRecursive(0);
+    private Uni<AzureAnalyzeResponse> pollForResult(String resultId) {
+        log.debug("Starting polling for analysis result (resultId: {})...", resultId);
+        return pollAttemptRecursive(resultId, 0);
     }
 
     /**
      * Realiza polling recursivo del resultado.
      */
-    private Uni<AzureAnalyzeResponse> pollAttemptRecursive(int attempt) {
+    private Uni<AzureAnalyzeResponse> pollAttemptRecursive(String resultId, int attempt) {
         if (attempt >= MAX_POLLING_ATTEMPTS) {
             return Uni.createFrom().failure(
                     new DocumentIntelligenceApiException(
@@ -109,7 +160,7 @@ public class AzureDocumentIntelligenceAdapter implements DocumentIntelligencePor
 
         log.trace("Polling attempt {} of {}", attempt + 1, MAX_POLLING_ATTEMPTS);
 
-        return azureRestClient.getAnalysisResult(azureApiKey, API_VERSION)
+        return azureRestClient.getAnalysisResult(MODEL_ID, resultId, azureApiKey, API_VERSION)
                 .onFailure(WebApplicationException.class).transform(this::handleWebApplicationException)
                 .chain(response -> {
                     String status = response.getStatus();
@@ -133,7 +184,7 @@ public class AzureDocumentIntelligenceAdapter implements DocumentIntelligencePor
                             status, POLLING_INTERVAL.getSeconds());
                     return Uni.createFrom().item(attempt + 1)
                             .onItem().delayIt().by(POLLING_INTERVAL)
-                            .chain(this::pollAttemptRecursive);
+                            .chain(nextAttempt -> pollAttemptRecursive(resultId, nextAttempt));
                 });
     }
 
