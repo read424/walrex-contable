@@ -18,7 +18,7 @@ import org.walrex.domain.exception.LLMNotFoundException;
 @ApplicationScoped
 public class LLMStrategyFactory {
 
-    @ConfigProperty(name = "rag.llm.default-provider", defaultValue = "groq")
+    @ConfigProperty(name = "rag.llm.default-provider", defaultValue = "groq-chat")
     String defaultProvider;
 
     @Inject
@@ -34,7 +34,7 @@ public class LLMStrategyFactory {
 
     /**
      * Obtiene un adapter LLM específico por nombre.
-     * @param providerName "groq" o "ollama"
+     * @param providerName "groq-chat" o "ollama"
      */
     public ChatOutputPort getLLM(String providerName) {
         log.debug("Selecting LLM provider: {}", providerName);
@@ -44,11 +44,11 @@ public class LLMStrategyFactory {
         }
 
         // Groq es el default (no tiene @Alternative)
-        if ("groq".equalsIgnoreCase(providerName)) {
+        if ("groq-chat".equalsIgnoreCase(providerName)) {
             return chatAdapters.stream()
                 .filter(adapter -> adapter.getClass().getSimpleName().contains("Groq"))
                 .findFirst()
-                .orElseThrow(() -> new LLMNotFoundException("groq"));
+                .orElseThrow(() -> new LLMNotFoundException("groq-chat"));
         }
 
         // Ollama tiene @Alternative, necesita select manual

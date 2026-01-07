@@ -9,23 +9,10 @@ quarkus:
       max-body-size: 10M
     port: 8089
     non-application-root-path: /q
-    # Configuración de CORS
-    #cors:
-      #  ~: true  # Habilitar CORS para todas las rutas
-      #origins: "*"  # Permitir todos los orígenes (puedes especificar URLs específicas)
-      # Para producción, reemplaza "*" con tus dominios específicos:
-      # origins: "http://localhost:3000,https://tu-dominio.com,https://app.tu-dominio.com"
-      #methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      #headers: "accept,authorization,content-type,x-requested-with"
-      #exposed-headers: "Content-Disposition"
-      #access-control-max-age: 24H
-    #access-control-allow-credentials: false  # Cambiar a true si usas cookies/autenticación
-  # Deshabilitar Dev Services globalmente y para todas las extensiones
   devservices:
     enabled: false
   test:
     integration-test-profile: test
-  # Datasource REACTIVE para la aplicación
   datasource:
     devservices:
       enabled: false
@@ -38,7 +25,6 @@ quarkus:
   swagger-ui:
     always-include: true
     path: /swagger-ui
-  # Deshabilitar Dev Services específicamente para Redis
   redis:
     devservices:
       enabled: false
@@ -50,7 +36,6 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
-  # OpenTelemetry - Distributed Tracing
   otel:
     enabled: true
     sdk:
@@ -59,7 +44,7 @@ quarkus:
       name: admon-catalogo
     traces:
       sampler:
-        arg: 1.0  # Capturar el 100% de las trazas (en dev)
+        arg: 1.0
     exporter:
       otlp:
         endpoint: http://localhost:4317
@@ -71,70 +56,88 @@ quarkus:
         service.name: admon-catalogo
         service.version: 1.0.0-SNAPSHOT
         deployment.environment: dev
-
   micrometer:
     enabled: true
     registry-enabled-default: false
     export:
       prometheus:
         path: /q/metrics
+    binder-enabled-default: true
     binder:
-      # JVM Metrics
       jvm: true
-      # System Metrics
       system: true
-      # HTTP Server Metrics
       http-server:
         enabled: true
         max-uri-tags: 100
-      # HTTP Client Metrics
       http-client:
         enabled: true
-      # Vert.x Metrics (Event Loop)
       vertx:
         enabled: true
-      # MP Metrics (MicroProfile)
       mp-metrics:
         enabled: true
-    binder-enabled-default: true
-  # Logging configuration moved to logback.xml
   log:
     level: INFO
     min-level: TRACE
-
-  # SmallRye Fault Tolerance Metrics
   smallrye-fault-tolerance:
 
-  # LangChain4j Configuration - Multiple Named Model Instances
   langchain4j:
-    # Deshabilitar DevServices para usar providers externos
     devservices:
       enabled: false
-    # Especificar provider para embedding model
+
+    # Define default providers to resolve ambiguity for any unqualified injections
+    chat-model:
+      provider: openai
     embedding-model:
-      provider: ollama
-    # Modelo "groq" usando OpenAI provider (Groq API)
-    groq:
+      provider: huggingface
+
+    # Named model provider assignments
+    groq-chat:
       chat-model:
         provider: openai
-    # Modelo "ollama-local" usando Ollama provider
-    ollama-local:
+    ollama-chat:
       chat-model:
         provider: ollama
-    # Provider OpenAI - Configuración para modelo "groq"
+    ollama-embed:
+      embedding-model:
+        provider: ollama
+
+    # --- Provider-Centric Configurations ---
+
+    # OpenAI Provider Configuration
     openai:
-      groq:
+      # Default OpenAI chat model configuration
+      base-url: https://api.groq.com/openai/v1
+      api-key: ${GROQ_API_KEY:changeme}
+      timeout: 60s
+      log-requests: false
+      log-responses: false
+      chat-model:
+        model-name: llama-3.1-8b-instant
+        temperature: 0.7
+      # Named model for Groq using OpenAI provider, which can be injected with @ModelName("groq-chat")
+      groq-chat:
+        api-key: ${GROQ_API_KEY:changeme}
         base-url: https://api.groq.com/openai/v1
-        api-key: ${GROQ_API_KEY}
         timeout: 60s
         log-requests: false
         log-responses: false
         chat-model:
           model-name: llama-3.1-8b-instant
           temperature: 0.7
-    # Provider Ollama local
+
+    # HuggingFace Provider Configuration
+    huggingface:
+      api-key: ${HUGGING_FACE_API_KEY:}
+      embedding-model:
+        model-id: "BAAI/bge-large-en-v1.5"
+        timeout: 60s
+
+    # Ollama Provider Configuration
     ollama:
-      ollama-local:
+      base-url: http://localhost:11434
+      timeout: 60s
+      # Named model for Ollama chat, to be injected with @ModelName("ollama-chat")
+      ollama-chat:
         base-url: http://localhost:11434
         timeout: 60s
         log-requests: false
@@ -142,70 +145,57 @@ quarkus:
         chat-model:
           model-id: llama3.2
           temperature: 0.7
-      # Embedding model sin nombre (default)
-      base-url: http://localhost:11434
-      timeout: 60s
-      devservices:
-        enabled: false
-      embedding-model:
-        model-id: mxbai-embed-large
-        # mxbai genera embeddings de 1024 dimensiones
+      # Named model for Ollama embeddings, to be injected with @ModelName("ollama-embed")
+      ollama-embed:
+        base-url: http://localhost:11434
+        timeout: 60s
+        embedding-model:
+          model-id: mxbai-embed-large
 
-    # Qdrant Vector Database Configuration
+    # Qdrant configuration
     qdrant:
       host: localhost
       port: 6334
       api-key: ${QDRANT_API_KEY:}
       use-tls: false
       collection:
-        name: accounting_data  # Colección para accounts y journal entries
-      dimension: 1024  # mxbai-embed-large genera vectores de 1024 dimensiones
-      distance: Cosine
-
-
-  # REST Client configuration for Binance P2P API
+        name: accounting_data
+      
   rest-client:
     binance-p2p:
       url: https://p2p.binance.com
       scope: jakarta.enterprise.context.ApplicationScoped
       read-timeout: 30000
       connect-timeout: 10000
-    # Azure Document Intelligence REST Client
     azure-doc-intel:
-      url: https://mi-extractor-documentos.cognitiveservices.azure.com/
+      url: https://mi-extractor-documentos.cognitiveservices.azure.com
       scope: jakarta.enterprise.context.ApplicationScoped
       read-timeout: 60000
       connect-timeout: 10000
+      logging:
+        scope: request-response
+        body-limit: 1024
 
-# Azure Document Intelligence Configuration
 azure:
   doc:
     intel:
       key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
 
-# Embeddings Sync Configuration
 embeddings:
   sync:
     enabled: true
     on-startup: true
     batch-size: 50
 
-# RAG Configuration for Journal Entry Suggestions
 rag:
   llm:
-    # Proveedor LLM por defecto: "groq" o "ollama"
     default-provider: groq
-    # Fallback a Ollama si Groq falla
     enable-fallback: true
   search:
-    # Límites para búsqueda vectorial
     account-limit: 5
     historical-entry-limit: 3
-    # Threshold mínimo de similitud (0.0 a 1.0)
     similarity-threshold: 0.7
   historical:
-    # Habilitar almacenamiento automático de asientos en Qdrant
     auto-sync-enabled: true
-    # Sincronizar asientos al crearse/modificarse
     sync-on-create: true
     sync-on-update: false

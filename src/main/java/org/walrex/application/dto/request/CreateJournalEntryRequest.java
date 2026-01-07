@@ -40,8 +40,7 @@ public record CreateJournalEntryRequest(
      */
     @NotNull(message = "Lines are required")
     @Size(min = 2, message = "At least 2 lines are required for a journal entry")
-    @Valid
-    List<JournalEntryLineRequest> lines
+    List<@Valid JournalEntryLineRequest> lines
 ) {
     /**
      * Compact constructor for normalization.

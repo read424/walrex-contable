@@ -12,24 +12,22 @@ import org.walrex.application.port.output.EmbeddingOutputPort;
 
 import java.util.List;
 
-
 /**
- * Adaptador para generación de embeddings usando Ollama
+ * Adaptador para generación de embeddings usando el proveedor configurado por defecto en LangChain4j.
  */
 @Slf4j
 @ApplicationScoped
 @RegisterForReflection
-public class OllamaEmbeddingAdapter implements EmbeddingOutputPort {
+public class DefaultEmbeddingAdapter implements EmbeddingOutputPort {
 
     @Inject
-    EmbeddingModel embeddingModel;
+    EmbeddingModel embeddingModel; // Injects the default embedding model
 
     @Override
     public Uni<float[]> generateEmbedding(String text) {
         log.debug("Generating embedding for text: {}", text.substring(0, Math.min(50, text.length())));
 
         // Execute blocking LangChain4j call on worker thread
-        // Mutiny preserves the original context (event-loop) automatically after worker execution
         return Uni.createFrom().item(() -> {
             try {
                 Embedding embedding = embeddingModel.embed(text).content();
@@ -48,7 +46,6 @@ public class OllamaEmbeddingAdapter implements EmbeddingOutputPort {
                 throw new RuntimeException("Failed to generate embedding", e);
             }
         })
-        // Run blocking operation on worker pool, then Mutiny returns to original context
         .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }
