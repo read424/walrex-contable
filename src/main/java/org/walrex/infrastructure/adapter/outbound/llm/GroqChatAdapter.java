@@ -31,7 +31,7 @@ import java.util.List;
 public class GroqChatAdapter implements ChatOutputPort {
 
     @Inject
-    @ModelName("groq")
+    @ModelName("groq-chat")
     ChatModel chatModel;
 
     @Override
