@@ -31,7 +31,8 @@ public class DocumentAnalysisService implements AnalyzeDocumentUseCase {
             "application/pdf",
             "image/jpeg",
             "image/jpg",
-            "image/png"
+            "image/png",
+            "application/octet-stream"
     );
 
     @Inject
