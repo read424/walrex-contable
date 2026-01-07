@@ -33,7 +33,7 @@ import java.util.List;
 public class OllamaChatAdapter implements ChatOutputPort {
 
     @Inject
-    @ModelName("ollama-local")
+    @ModelName("ollama-chat")
     ChatModel chatModel;
 
     @Override
