@@ -13,7 +13,13 @@ import io.smallrye.mutiny.Uni;
 public interface SyncHistoricalEntriesUseCase {
 
     /**
-     * Sincroniza un asiento específico a Qdrant.
+     * Sincroniza un asiento específico a Qdrant con detección automática de caché.
+     *
+     * 🔑 OPTIMIZACIÓN AUTOMÁTICA:
+     * - Busca documentos adjuntos en las líneas del asiento
+     * - Si encuentra documentos, genera hash SHA-256 y busca en Redis cache
+     * - Si existe en caché, REUTILIZA el embedding (ahorra costos y latencia)
+     * - Si no existe, genera nuevo embedding como fallback
      *
      * @param journalEntryId ID del asiento a sincronizar
      * @return Uni<Void> cuando se complete la sincronización
