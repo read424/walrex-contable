@@ -10,7 +10,9 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.domain.model.ExchangeRate;
+import org.walrex.domain.model.ExchangeRateUpdate;
 import org.walrex.domain.model.RemittanceRoute;
+import org.walrex.domain.model.RouteRates;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -112,7 +114,7 @@ class ExchangeRateServiceTest {
                 .thenReturn(Uni.createFrom().item(Collections.emptyList()));
 
         // Act
-        ExchangeRateService.ExchangeRateUpdate result = exchangeRateService
+        ExchangeRateUpdate result = exchangeRateService
                 .updateExchangeRates()
                 .await()
                 .indefinitely();
@@ -122,13 +124,13 @@ class ExchangeRateServiceTest {
         assertEquals(2, result.ratesByPair().size()); // Dos pares
 
         // Verificar tasas de PEN->VES
-        ExchangeRateService.RouteRates penVesRates = result.ratesByPair().get("PEN/USDT/VES");
+        RouteRates penVesRates = result.ratesByPair().get("PEN/USDT/VES");
         assertNotNull(penVesRates, "Should have PEN/USDT/VES pair");
         assertEquals(2, penVesRates.buyRates().size());
         assertEquals(0, penVesRates.sellRates().size());
 
         // Verificar tasas de VES->PEN
-        ExchangeRateService.RouteRates vesPenRates = result.ratesByPair().get("VES/USDT/PEN");
+        RouteRates vesPenRates = result.ratesByPair().get("VES/USDT/PEN");
         assertNotNull(vesPenRates, "Should have VES/USDT/PEN pair");
         assertEquals(1, vesPenRates.buyRates().size());
         assertEquals(0, vesPenRates.sellRates().size());
@@ -165,7 +167,7 @@ class ExchangeRateServiceTest {
         // Act & Assert - Debería fallar al intentar calcular el promedio con lista vacía
         // o devolver un resultado con listas vacías
         try {
-            ExchangeRateService.ExchangeRateUpdate result = exchangeRateService
+            ExchangeRateUpdate result = exchangeRateService
                     .updateExchangeRates()
                     .await()
                     .indefinitely();
@@ -188,7 +190,7 @@ class ExchangeRateServiceTest {
                 .thenReturn(Uni.createFrom().item(Collections.emptyList()));
 
         // Act
-        ExchangeRateService.ExchangeRateUpdate result = exchangeRateService
+        ExchangeRateUpdate result = exchangeRateService
                 .updateExchangeRates()
                 .await()
                 .indefinitely();

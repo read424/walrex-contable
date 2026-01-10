@@ -48,6 +48,10 @@ public class AccountingAccountRepository implements PanacheRepositoryBase<Accoun
                 .firstResult();
     }
 
+    public Uni<Long> countUnsynced(){
+        return count("embeddingsSynced = false AND active = true AND deletedAt IS NULL");
+    }
+
     // ==================== Verificaciones de Unicidad ====================
 
     /**
@@ -151,6 +155,14 @@ public class AccountingAccountRepository implements PanacheRepositoryBase<Accoun
                 .list();
     }
 
+    /**
+     * Listar cuentas contables no sincronizadas a qdrant
+     */
+
+    public Uni<List<AccountingAccountEntity>> findAllUnsynced(){
+        return find("embeddingsSynced = false AND active = true AND deletedAt IS NULL")
+                .list();
+    }
     // ==================== Métodos Privados de Utilidad ====================
 
     /**

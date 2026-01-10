@@ -7,10 +7,19 @@ import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.walrex.application.port.input.SyncHistoricalEntriesUseCase;
+import org.walrex.application.port.output.EmbeddingCachePort;
 import org.walrex.application.port.output.JournalEntryQueryPort;
 import org.walrex.application.port.output.VectorStorePort;
+import org.walrex.domain.model.AccountingBookType;
 import org.walrex.domain.model.JournalEntry;
+import org.walrex.domain.model.JournalEntryDocument;
+import org.walrex.domain.model.JournalEntryLine;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Servicio para sincronizar asientos contables históricos a Qdrant.
@@ -29,6 +38,12 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
     @Inject
     VectorStorePort vectorStorePort;
 
+    @Inject
+    EmbeddingCachePort embeddingCache;
+
+    @Inject
+    HashService hashService;
+
     @ConfigProperty(name = "rag.historical.auto-sync-enabled", defaultValue = "true")
     Boolean autoSyncEnabled;
 
@@ -41,7 +56,7 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
             return Uni.createFrom().voidItem();
         }
 
-        log.info("Syncing journal entry {} to Qdrant", journalEntryId);
+        log.info("Syncing journal entry {} to Qdrant with automatic cache detection", journalEntryId);
 
         return journalEntryQueryPort.findById(journalEntryId)
                 .onItem().transformToUni(optionalEntry -> {
@@ -53,9 +68,40 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
 
                     JournalEntry entry = optionalEntry.get();
 
-                    // Crear chunk con embedding
-                    return chunkingService.createHistoricalChunk(entry)
-                            .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
+                    // Buscar documentos adjuntos en las líneas del asiento
+                    String imageHash = extractImageHashFromEntry(entry);
+
+                    if (imageHash != null) {
+                        log.info("Found document attachment in entry {}. Trying to reuse cached embedding with hash: {}",
+                                journalEntryId, imageHash);
+
+                        // Intentar recuperar embedding del caché
+                        return embeddingCache.get(imageHash, entry.getBookType())
+                                .onItem().transformToUni(cachedEmbedding -> {
+                                    if (cachedEmbedding != null) {
+                                        log.info("✅ Embedding cache HIT! Reusing cached embedding for entry {}",
+                                                journalEntryId);
+                                        // REUTILIZAR embedding del caché
+                                        return chunkingService.createHistoricalChunkFromCache(
+                                                entry,
+                                                cachedEmbedding.getEmbedding(),
+                                                imageHash
+                                        );
+                                    } else {
+                                        log.info("Embedding cache MISS for entry {}. Generating new embedding",
+                                                journalEntryId);
+                                        // Fallback: generar nuevo embedding pero guardar el hash
+                                        return chunkingService.createHistoricalChunk(entry, imageHash);
+                                    }
+                                })
+                                .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
+                    } else {
+                        log.debug("No document attachments found in entry {}. Generating embedding without cache",
+                                journalEntryId);
+                        // Sin documentos adjuntos, crear chunk normal
+                        return chunkingService.createHistoricalChunk(entry, null)
+                                .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
+                    }
                 })
                 .onItem().invoke(() ->
                         log.info("Successfully synced journal entry {} to Qdrant", journalEntryId)
@@ -64,6 +110,46 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
                         log.error("Failed to sync journal entry {} to Qdrant", journalEntryId, throwable)
                 );
     }
+
+    /**
+     * Extrae el hash SHA-256 del primer documento adjunto encontrado en las líneas del asiento.
+     * Si no hay documentos, retorna null.
+     *
+     * @param entry Asiento contable con posibles documentos adjuntos
+     * @return Hash SHA-256 del primer documento, o null si no hay documentos
+     */
+    private String extractImageHashFromEntry(JournalEntry entry) {
+        if (entry.getLines() == null || entry.getLines().isEmpty()) {
+            return null;
+        }
+
+        // Buscar el primer documento adjunto en cualquier línea
+        for (JournalEntryLine line : entry.getLines()) {
+            if (line.getDocuments() != null && !line.getDocuments().isEmpty()) {
+                JournalEntryDocument firstDoc = line.getDocuments().getFirst();
+
+                try {
+                    // Leer el archivo y generar hash
+                    Path filePath = Path.of(firstDoc.getFilePath());
+
+                    if (Files.exists(filePath)) {
+                        byte[] fileBytes = Files.readAllBytes(filePath);
+                        String hash = hashService.generateSHA256(fileBytes);
+
+                        log.debug("Generated hash {} for document: {}", hash, firstDoc.getOriginalFilename());
+                        return hash;
+                    } else {
+                        log.warn("Document file not found: {}", filePath);
+                    }
+                } catch (IOException e) {
+                    log.error("Error reading document file: {}", firstDoc.getFilePath(), e);
+                }
+            }
+        }
+
+        return null;
+    }
+
 
     @Override
     @WithSpan("HistoricalEntriesSyncService.removeEntry")
@@ -95,7 +181,7 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
                             entries.stream()
                                     .map(entry -> syncSingleEntry(entry))
                                     .toList()
-                    ).combinedWith(results -> results.size());
+                    ).with(results -> results.size());
                 })
                 .onItem().invoke(count ->
                         log.info("Successfully synced {} historical journal entries to Qdrant", count)
@@ -109,7 +195,7 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
      * Sincroniza un asiento individual (helper method).
      */
     private Uni<Void> syncSingleEntry(JournalEntry entry) {
-        return chunkingService.createHistoricalChunk(entry)
+        return chunkingService.createHistoricalChunk(entry, null)
                 .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk))
                 .onItem().invoke(() ->
                         log.debug("Synced entry ID {} to Qdrant", entry.getId())

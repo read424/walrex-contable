@@ -7,7 +7,9 @@ import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.walrex.application.port.input.GenerateJournalEntrySuggestionsUseCase;
+import org.walrex.application.port.output.AzureAnalysisCachePort;
 import org.walrex.application.port.output.ChatOutputPort;
+import org.walrex.application.port.output.EmbeddingCachePort;
 import org.walrex.application.port.output.VectorStorePort;
 import org.walrex.domain.model.*;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
@@ -21,6 +23,18 @@ import java.time.Duration;
 @Slf4j
 @ApplicationScoped
 public class RAGOrchestratorService implements GenerateJournalEntrySuggestionsUseCase {
+
+    @Inject
+    HashService hashService;
+
+    @Inject
+    AzureAnalysisCachePort azureAnalysisCachePort;
+
+    @Inject
+    EmbeddingCachePort embeddingCachePort;
+
+    @Inject
+    SemanticChunkingService semanticChunkingService;
 
     @Inject
     LLMStrategyFactory llmFactory;
@@ -49,7 +63,7 @@ public class RAGOrchestratorService implements GenerateJournalEntrySuggestionsUs
         // 1. Extraer contexto del documento
         String searchQuery = extractSearchQuery(context);
         log.debug("Search query generated: {}", searchQuery);
-
+        log.info("Search query generated: {}", searchQuery);
         // 2. Generar embedding del query
         return embeddingService.generate(searchQuery)
                 // 3. Búsqueda vectorial híbrida en Qdrant

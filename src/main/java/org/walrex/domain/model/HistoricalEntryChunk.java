@@ -61,6 +61,17 @@ public class HistoricalEntryChunk {
     private BigDecimal totalCredit;
 
     /**
+     * Hash SHA-256 de la imagen/documento original (trazabilidad)
+     */
+    private String conceptHash;
+
+    /**
+     * Códigos de cuentas usadas en el asiento (separados por coma)
+     * Ejemplo: "16111,101011"
+     */
+    private String accountCodes;
+
+    /**
      * Score de similitud con el query (0.0 a 1.0).
      */
     private Float similarityScore;

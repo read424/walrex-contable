@@ -88,7 +88,7 @@ quarkus:
     chat-model:
       provider: openai
     embedding-model:
-      provider: huggingface
+      provider: openai
 
     # Named model provider assignments
     groq-chat:
@@ -105,16 +105,15 @@ quarkus:
 
     # OpenAI Provider Configuration
     openai:
-      # Default OpenAI chat model configuration
-      base-url: https://api.groq.com/openai/v1
-      api-key: ${GROQ_API_KEY:changeme}
+      # Default OpenAI configuration for embeddings
+      api-key: ${OPENAI_API_KEY:changeme}
       timeout: 60s
       log-requests: false
       log-responses: false
-      chat-model:
-        model-name: llama-3.1-8b-instant
-        temperature: 0.7
-      # Named model for Groq using OpenAI provider, which can be injected with @ModelName("groq-chat")
+      embedding-model:
+        model-name: text-embedding-3-small
+        dimensions: 1536
+      # Named model for Groq chat using OpenAI-compatible API
       groq-chat:
         api-key: ${GROQ_API_KEY:changeme}
         base-url: https://api.groq.com/openai/v1
@@ -127,9 +126,13 @@ quarkus:
 
     # HuggingFace Provider Configuration
     huggingface:
+      base-url: https://router.huggingface.co
       api-key: ${HUGGING_FACE_API_KEY:}
+      timeout: 60s
+      log-requests: false
+      log-responses: false
       embedding-model:
-        model-id: "BAAI/bge-large-en-v1.5"
+        model-id: "sentence-transformers/all-MiniLM-L6-v2"
         timeout: 60s
 
     # Ollama Provider Configuration
@@ -160,7 +163,7 @@ quarkus:
       use-tls: false
       collection:
         name: accounting_data
-      
+
   rest-client:
     binance-p2p:
       url: https://p2p.binance.com
@@ -176,6 +179,14 @@ quarkus:
         scope: request-response
         body-limit: 1024
 
+    
+    # Qdrant native client configuration (used by QdrantCollectionInitializer)
+    qdrant:
+      dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
+      distance: Cosine
+      collection:
+        name: accounting_data
+          
 azure:
   doc:
     intel:
@@ -188,6 +199,10 @@ embeddings:
     batch-size: 50
 
 rag:
+  cache:
+    enabled: true
+    azure-ttl-days: 30
+    embedding-ttl-days: 30
   llm:
     default-provider: groq
     enable-fallback: true

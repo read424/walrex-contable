@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.walrex.application.port.input.UpdateExchangeRatesUseCase;
 import org.walrex.application.port.output.ExchangeRateCachePort;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.application.port.output.PaymentMethodQueryPort;
@@ -12,6 +13,8 @@ import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeRate;
 import org.walrex.domain.model.ExchangeRateCache;
 import org.walrex.domain.model.RemittanceRoute;
+import org.walrex.domain.model.ExchangeRateUpdate;
+import org.walrex.domain.model.RouteRates;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,9 +25,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Servicio de dominio para gestionar tasas de cambio entre Perú y Venezuela
@@ -38,7 +39,7 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @ApplicationScoped
-public class ExchangeRateService {
+public class ExchangeRateService implements UpdateExchangeRatesUseCase {
 
     private static final BigDecimal CHANGE_THRESHOLD_PERCENT = BigDecimal.valueOf(0.5); // ±0.5%
     private static final Duration CACHE_TTL = Duration.ofHours(12); // 12 horas
@@ -63,6 +64,7 @@ public class ExchangeRateService {
      *
      * @return Uni con todas las tasas actualizadas
      */
+    @Override
     public Uni<ExchangeRateUpdate> updateExchangeRates() {
         log.info("Starting exchange rate update for remittances");
 
@@ -375,7 +377,7 @@ public class ExchangeRateService {
 
         // Crear lista de operaciones de guardado para cada par
         List<Uni<Integer>> saveOperations = update.ratesByPair().values().stream()
-                .map(rates -> {
+                .flatMap(rates -> {
                     Integer currencyFromId = rates.currencyFromId();  // ID moneda origen (PEN)
                     Integer currencyToId = rates.currencyToId();      // ID moneda destino (VES)
                     String currencyFrom = rates.currencyFromCode();   // PEN
@@ -391,6 +393,13 @@ public class ExchangeRateService {
                     log.info("=== [AVERAGES] BUY USDT/{}: {} | SELL USDT/{}: {} ===",
                             currencyFrom, avgBuy, currencyTo, avgSell);
 
+                    // --- DEFENSA CONTRA CÁLCULOS CON TASAS INVÁLIDAS/CERO ---
+                    if (avgBuy.compareTo(BigDecimal.ZERO) <= 0 || avgSell.compareTo(BigDecimal.ZERO) <= 0) {
+                        log.warn("=== [SKIP] Skipping {}->{} due to zero or missing rates (buy: {}, sell: {}) ===",
+                                currencyFrom, currencyTo, avgBuy, avgSell);
+                        return java.util.stream.Stream.empty(); // Saltar este par
+                    }
+
                     // Calcular tasa cruzada: cuántos VES por cada PEN
                     // Fórmula: precio_venta_VES / precio_compra_PEN
                     BigDecimal crossRate = avgSell.divide(avgBuy, 5, RoundingMode.HALF_UP);
@@ -404,7 +413,7 @@ public class ExchangeRateService {
                             currencyFrom, currencyTo, crossRate, marginRate);
 
                     // Verificar caché y decidir si guardar en BD
-                    return saveRateWithCache(
+                    return java.util.stream.Stream.of(saveRateWithCache(
                             currencyFromId,
                             currencyFrom,
                             currencyToId,
@@ -413,7 +422,7 @@ public class ExchangeRateService {
                             rates.countryCurrencyToId(),
                             marginRate,
                             today
-                    );
+                    ));
                 })
                 .toList();
 
@@ -632,28 +641,6 @@ public class ExchangeRateService {
                 )
                 .onFailure().recoverWithItem(0);
     }
-
-
-    /**
-     * Record para encapsular el resultado de la actualización
-     */
-    public record ExchangeRateUpdate(
-            Map<String, RouteRates> ratesByPair
-    ) {}
-
-    /**
-     * Record para las tasas de un par de monedas específico
-     */
-    public record RouteRates(
-            Integer currencyFromId,        // ID moneda origen (ej: PEN)
-            String currencyFromCode,       // Código moneda origen (ej: PEN)
-            Integer currencyToId,          // ID moneda destino (ej: VES)
-            String currencyToCode,         // Código moneda destino (ej: VES)
-            Long countryCurrencyFromId,    // ID country_currency origen
-            Long countryCurrencyToId,      // ID country_currency destino
-            List<ExchangeRate> buyRates,   // Tasas para comprar USDT con moneda origen
-            List<ExchangeRate> sellRates   // Tasas para vender USDT por moneda destino
-    ) {}
 
     /**
      * Calcula la diferencia porcentual entre dos tasas.

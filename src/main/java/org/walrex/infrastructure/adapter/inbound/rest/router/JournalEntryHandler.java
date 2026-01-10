@@ -15,6 +15,8 @@ import org.walrex.application.dto.request.CreateJournalEntryRequest;
 import org.walrex.application.dto.request.JournalEntryLineRequest;
 import org.walrex.application.dto.response.JournalEntryResponse;
 import org.walrex.application.port.input.CreateJournalEntryUseCase;
+import org.walrex.application.port.input.SyncHistoricalEntriesUseCase;
+import org.walrex.application.port.output.JournalEntryQueryPort;
 import org.walrex.domain.exception.InvalidJournalEntryException;
 import org.walrex.domain.exception.UnbalancedJournalEntryException;
 import org.walrex.domain.model.JournalEntry;
@@ -53,10 +55,10 @@ public class JournalEntryHandler {
     DocumentProcessorService documentProcessorService;
 
     @Inject
-    org.walrex.application.port.input.SyncHistoricalEntriesUseCase syncHistoricalEntriesUseCase;
+    SyncHistoricalEntriesUseCase syncHistoricalEntriesUseCase;
 
     @Inject
-    org.walrex.application.port.output.JournalEntryQueryPort journalEntryQueryPort;
+    JournalEntryQueryPort journalEntryQueryPort;
 
     /**
      * POST /api/v1/journal-entries - Create a new journal entry

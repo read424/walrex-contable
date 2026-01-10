@@ -1,5 +1,7 @@
 package org.walrex.infrastructure.adapter.outbound.qdrant;
 
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
@@ -8,12 +10,13 @@ import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import dev.langchain4j.store.embedding.filter.logical.And;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
-import io.quarkus.runtime.Startup;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.VectorStorePort;
+import org.walrex.domain.exception.VectorDimensionMismatchException;
 import org.walrex.domain.model.AccountChunk;
 import org.walrex.domain.model.AccountSearchResult;
 import org.walrex.domain.model.AccountingBookType;
@@ -50,38 +53,43 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
                 accountChunk.getAccountId(), accountChunk.getCode());
 
         return Uni.createFrom().item(() -> {
-            // Crear metadata
-            Map<String, Object> metadataMap = new HashMap<>();
-            metadataMap.put("chunk_type", "account");  // Diferenciar de journal entries
-            metadataMap.put("account_id", accountChunk.getAccountId());
-            metadataMap.put("code", accountChunk.getCode());
-            metadataMap.put("name", accountChunk.getName());
-            metadataMap.put("type", accountChunk.getType().name());
-            metadataMap.put("normal_side", accountChunk.getNormalSide().name());
-            metadataMap.put("active", String.valueOf(accountChunk.getActive()));  // Boolean -> String
+            try {
+                // Crear metadata
+                Map<String, Object> metadataMap = new HashMap<>();
+                metadataMap.put("chunk_type", "account");  // Diferenciar de journal entries
+                metadataMap.put("account_id", accountChunk.getAccountId());
+                metadataMap.put("code", accountChunk.getCode());
+                metadataMap.put("name", accountChunk.getName());
+                metadataMap.put("type", accountChunk.getType().name());
+                metadataMap.put("normal_side", accountChunk.getNormalSide().name());
+                metadataMap.put("active", String.valueOf(accountChunk.getActive()));  // Boolean -> String
 
-            // Crear Metadata de LangChain4j
-            dev.langchain4j.data.document.Metadata metadata =
-                    dev.langchain4j.data.document.Metadata.from(metadataMap);
+                // Crear Metadata de LangChain4j
+                Metadata metadata =
+                        Metadata.from(metadataMap);
 
-            // Crear TextSegment con el chunk text y metadata
-            TextSegment textSegment = TextSegment.from(accountChunk.getChunkText(), metadata);
+                // Crear TextSegment con el chunk text y metadata
+                TextSegment textSegment = TextSegment.from(accountChunk.getChunkText(), metadata);
 
-            // Crear embedding de LangChain4j
-            dev.langchain4j.data.embedding.Embedding embedding =
-                    dev.langchain4j.data.embedding.Embedding.from(accountChunk.getEmbedding());
+                // Crear embedding de LangChain4j dev.langchain4j.data.embedding.
+                Embedding embedding =
+                        Embedding.from(accountChunk.getEmbedding());
 
-            // Generar UUID determinístico a partir del account_id
-            // Esto permite regenerar el mismo UUID para la misma cuenta
-            String namespace = "account-";
-            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + accountChunk.getAccountId()).getBytes(StandardCharsets.UTF_8));
-            String pointId = pointUuid.toString();
+                // Generar UUID determinístico a partir del account_id
+                // Esto permite regenerar el mismo UUID para la misma cuenta
+                String namespace = "account-";
+                UUID pointUuid = UUID.nameUUIDFromBytes((namespace + accountChunk.getAccountId()).getBytes(StandardCharsets.UTF_8));
+                String pointId = pointUuid.toString();
 
-            // Almacenar en Qdrant (el metadata ya está en el embedding store internamente)
-            embeddingStore.add(pointId, embedding);
+                // Almacenar en Qdrant (el metadata ya está en el embedding store internamente)
+                embeddingStore.add(pointId, embedding);
 
-            log.debug("Successfully upserted embedding for account: {}", accountChunk.getCode());
-            return (Void) null;
+                log.debug("Successfully upserted embedding for account: {}", accountChunk.getCode());
+                return (Void) null;
+            } catch (RuntimeException e) {
+                handleVectorStoreException(e, accountChunk.getEmbedding().length);
+                throw e; // No debería llegar aquí si es un error de dimensiones
+            }
         }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
     }
 
@@ -250,32 +258,43 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
         log.debug("Upserting historical entry chunk for journal entry ID: {}", chunk.getJournalEntryId());
 
         return Uni.createFrom().item(() -> {
-            // Metadata con chunk_type para diferenciación
-            Map<String, Object> metadataMap = new HashMap<>();
-            metadataMap.put("chunk_type", "journal_entry");  // KEY DIFERENCIADOR
-            metadataMap.put("journal_entry_id", chunk.getJournalEntryId());
-            metadataMap.put("entry_date", chunk.getEntryDate().toString());
-            metadataMap.put("book_type", chunk.getBookType().name());
-            metadataMap.put("description", chunk.getDescription());
-            metadataMap.put("total_debit", chunk.getTotalDebit().toString());
-            metadataMap.put("total_credit", chunk.getTotalCredit().toString());
+            try {
+                // Metadata con chunk_type para diferenciación
+                Map<String, Object> metadataMap = new HashMap<>();
+                metadataMap.put("chunk_type", "journal_entry");  // KEY DIFERENCIADOR
+                metadataMap.put("journal_entry_id", chunk.getJournalEntryId());
+                metadataMap.put("entry_date", chunk.getEntryDate().toString());
+                metadataMap.put("book_type", chunk.getBookType().name());
+                metadataMap.put("description", chunk.getDescription());
+                metadataMap.put("total_debit", chunk.getTotalDebit().toString());
+                metadataMap.put("total_credit", chunk.getTotalCredit().toString());
 
-            dev.langchain4j.data.document.Metadata metadata =
-                    dev.langchain4j.data.document.Metadata.from(metadataMap);
+                // ========== NUEVOS CAMPOS ==========
+                if (chunk.getConceptHash() != null) {
+                    metadataMap.put("concept_hash", chunk.getConceptHash());
+                }
 
-            TextSegment textSegment = TextSegment.from(chunk.getChunkText(), metadata);
-            dev.langchain4j.data.embedding.Embedding embedding =
-                    dev.langchain4j.data.embedding.Embedding.from(chunk.getEmbedding());
+                if (chunk.getAccountCodes() != null && !chunk.getAccountCodes().isEmpty()) {
+                    metadataMap.put("account_codes", chunk.getAccountCodes());
+                }
 
-            // Generar UUID determinístico para journal entry
-            String namespace = "journal-entry-";
-            UUID pointUuid = UUID.nameUUIDFromBytes((namespace + chunk.getJournalEntryId()).getBytes(StandardCharsets.UTF_8));
-            String pointId = pointUuid.toString();
-            embeddingStore.add(pointId, embedding);
+                Metadata metadata = Metadata.from(metadataMap);
+                TextSegment textSegment = TextSegment.from(chunk.getChunkText(), metadata);
+                Embedding embedding = Embedding.from(chunk.getEmbedding());
 
-            log.debug("Successfully upserted historical entry chunk");
-            return (Void) null;
-        }).runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+                // Generar UUID determinístico para journal entry
+                String namespace = "journal-entry-";
+                UUID pointUuid = UUID.nameUUIDFromBytes((namespace + chunk.getJournalEntryId()).getBytes(StandardCharsets.UTF_8));
+                String pointId = pointUuid.toString();
+                embeddingStore.add(pointId, embedding);
+
+                log.debug("Successfully upserted historical entry chunk");
+                return (Void) null;
+            } catch (RuntimeException e) {
+                handleVectorStoreException(e, chunk.getEmbedding().length);
+                throw e; // No debería llegar aquí si es un error de dimensiones
+            }
+        }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @Override
@@ -395,5 +414,73 @@ public class QdrantVectorStoreAdapter implements VectorStorePort {
                 .totalCredit(new BigDecimal((String) metadata.get("total_credit")))
                 .similarityScore(match.score().floatValue())
                 .build();
+    }
+
+    /**
+     * Maneja excepciones del vector store, detectando errores críticos de dimensiones.
+     * Si detecta un error de dimensiones, lanza VectorDimensionMismatchException para
+     * detener inmediatamente el proceso y evitar consumo innecesario de APIs.
+     *
+     * @param e Exception capturada del vector store
+     * @param actualDimension Dimensión real del vector generado
+     * @throws VectorDimensionMismatchException si detecta error de dimensiones
+     */
+    private void handleVectorStoreException(RuntimeException e, int actualDimension) {
+        String errorMessage = e.getMessage();
+        Throwable cause = e.getCause();
+
+        // Buscar el mensaje de error en la cadena de causas
+        while (cause != null) {
+            if (cause.getMessage() != null) {
+                errorMessage = cause.getMessage();
+
+                // Detectar error de dimensiones: "Vector dimension error: expected dim: X, got Y"
+                if (errorMessage.contains("Vector dimension error") &&
+                    errorMessage.contains("expected dim:") &&
+                    errorMessage.contains("got")) {
+
+                    // Parsear dimensión esperada del mensaje
+                    Integer expectedDim = extractExpectedDimension(errorMessage);
+
+                    log.error("🚨 CRITICAL ERROR: Vector dimension mismatch detected! " +
+                             "Expected: {} dimensions, Got: {} dimensions. " +
+                             "Stopping sync process to prevent API consumption.",
+                             expectedDim, actualDimension);
+
+                    throw new VectorDimensionMismatchException(
+                        "Vector dimension mismatch en Qdrant",
+                        expectedDim != null ? expectedDim : 0,
+                        actualDimension
+                    );
+                }
+            }
+            cause = cause.getCause();
+        }
+    }
+
+    /**
+     * Extrae la dimensión esperada del mensaje de error de Qdrant.
+     * Mensaje esperado: "Vector dimension error: expected dim: 1024, got 1536"
+     */
+    private Integer extractExpectedDimension(String errorMessage) {
+        try {
+            // Buscar patrón "expected dim: NUMBER"
+            int expectedIndex = errorMessage.indexOf("expected dim:");
+            if (expectedIndex != -1) {
+                String afterExpected = errorMessage.substring(expectedIndex + "expected dim:".length()).trim();
+                // Extraer número hasta la siguiente coma o espacio
+                int endIndex = afterExpected.indexOf(',');
+                if (endIndex == -1) {
+                    endIndex = afterExpected.indexOf(' ');
+                }
+                if (endIndex != -1) {
+                    String dimStr = afterExpected.substring(0, endIndex).trim();
+                    return Integer.parseInt(dimStr);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse expected dimension from error message: {}", errorMessage);
+        }
+        return null;
     }
 }

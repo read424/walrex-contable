@@ -6,7 +6,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-import org.walrex.domain.service.ExchangeRateService;
+import org.walrex.application.port.input.UpdateExchangeRatesUseCase;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ExchangeRateScheduler {
 
     @Inject
-    ExchangeRateService exchangeRateService;
+    UpdateExchangeRatesUseCase exchangeRateService;
 
     /**
      * Predicado para deshabilitar el scheduler inicial después de la primera ejecución
