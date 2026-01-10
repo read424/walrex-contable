@@ -53,9 +53,6 @@ public class JournalEntryRouter {
                                         "bookType": "DIARIO",
                                         "description": "Asiento de apertura del ejercicio 2024",
                                         "reference": null,
-                                        "docTypeId": null,
-                                        "docSerie": null,
-                                        "docNumber": null,
                                         "lines": [
                                             {
                                                 "accountId": 1,
@@ -87,15 +84,11 @@ public class JournalEntryRouter {
                                     value = """
                                             {
                                                 "id": 1,
+                                                "bookType": "DIARIO",
                                                 "entryDate": "2024-01-01",
-                                                "description": "Asiento de apertura del ejercicio 2024",
-                                                "reference": null,
-                                                "docTypeId": null,
-                                                "docSerie": null,
-                                                "docNumber": null,
                                                 "operationNumber": 1,
                                                 "bookCorrelative": 1,
-                                                "bookType": "DIARIO",
+                                                "description": "Asiento de apertura del ejercicio 2024",
                                                 "status": "ACTIVE",
                                                 "lines": [
                                                     {
