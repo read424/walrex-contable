@@ -11,6 +11,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.walrex.application.port.input.SyncAccountEmbeddingsUseCase;
 import org.walrex.application.port.output.AccountSyncQueryPort;
 import org.walrex.application.port.output.VectorStorePort;
+import org.walrex.domain.exception.VectorDimensionMismatchException;
 import org.walrex.domain.model.AccountChunk;
 import org.walrex.domain.model.AccountingAccount;
 import org.walrex.domain.model.SyncResult;
@@ -45,6 +46,7 @@ public class AccountEmbeddingSyncService implements SyncAccountEmbeddingsUseCase
     @Override
     @WithSpan("AccountEmbeddingSyncService.syncUnsyncedAccounts")
     @LogExecutionTime(value = LogExecutionTime.LogLevel.INFO)
+    @io.quarkus.hibernate.reactive.panache.common.WithTransaction
     public Uni<SyncResult> syncUnsyncedAccounts() {
         log.info("Starting synchronization of unsynced accounts (batch size: {})", batchSize);
 
@@ -67,6 +69,15 @@ public class AccountEmbeddingSyncService implements SyncAccountEmbeddingsUseCase
                                         account.getCode(), account.getName());
                             })
                             .onFailure().recoverWithItem(throwable -> {
+                                // FAIL-FAST: Si es error crítico de dimensiones, propagar inmediatamente
+                                if (throwable instanceof VectorDimensionMismatchException) {
+                                    log.error("🚨 CRITICAL CONFIGURATION ERROR DETECTED! " +
+                                             "Stopping all sync operations to prevent API consumption. " +
+                                             "Error: {}", throwable.getMessage());
+                                    throw (VectorDimensionMismatchException) throwable;
+                                }
+
+                                // Para otros errores, continuar con el siguiente account
                                 failCount.incrementAndGet();
                                 log.error("Failed to sync account: {} ({})",
                                         account.getCode(), account.getName(), throwable);
@@ -155,7 +166,7 @@ public class AccountEmbeddingSyncService implements SyncAccountEmbeddingsUseCase
                 .chain(chunk -> vectorStorePort.upsertAccountEmbedding(chunk))
                 // CRÍTICO: Volver al event-loop de Vert.x antes de operación DB con Hibernate Reactive
                 .emitOn(command -> vertx.getOrCreateContext().runOnContext(v -> command.run()))
-                .call(() -> accountSyncQueryPort.markAsSynced(account.getId()))
+                .chain(() -> accountSyncQueryPort.markAsSynced(account.getId()))
                 .onFailure().invoke(throwable ->
                         log.error("Error syncing account {}: {}", account.getCode(), throwable.getMessage())
                 );
