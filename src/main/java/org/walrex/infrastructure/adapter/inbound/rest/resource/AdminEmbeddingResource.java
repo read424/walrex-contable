@@ -17,7 +17,10 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.walrex.application.dto.response.EmbeddingGenerationResponse;
 import org.walrex.application.dto.response.ErrorResponse;
 import org.walrex.application.port.input.GenerateIntentEmbeddingsUseCase;
+import org.walrex.application.port.input.SyncAccountEmbeddingsUseCase;
+import org.walrex.application.port.input.SyncHistoricalEntriesUseCase;
 import org.walrex.application.port.output.IntentEmbeddingOutputPort;
+import org.walrex.infrastructure.adapter.outbound.logging.EmbeddingDebugLogger;
 
 /**
  * Endpoint administrativo para gestión de embeddings de intents
@@ -37,13 +40,13 @@ public class AdminEmbeddingResource {
     IntentEmbeddingOutputPort intentPersistence;
 
     @Inject
-    org.walrex.infrastructure.adapter.outbound.logging.EmbeddingDebugLogger debugLogger;
+    EmbeddingDebugLogger debugLogger;
 
     @Inject
-    org.walrex.application.port.input.SyncHistoricalEntriesUseCase historicalEntriesSyncUseCase;
+    SyncHistoricalEntriesUseCase historicalEntriesSyncUseCase;
 
     @Inject
-    org.walrex.application.port.input.SyncAccountEmbeddingsUseCase syncAccountEmbeddingsUseCase;
+    SyncAccountEmbeddingsUseCase syncAccountEmbeddingsUseCase;
 
     @POST
     @Path("/generate")
