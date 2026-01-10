@@ -28,18 +28,10 @@ public class PaymentMethodPersistenceAdapter implements PaymentMethodQueryPort {
         log.debug("Querying payment methods for country_currency: {}", countryCurrencyId);
 
         return repository.findActiveByCountryCurrencyId(countryCurrencyId)
-                .map(entities -> {
-                    List<String> paymentCodes = entities.stream()
-                            .map(entity -> entity.getBank().getNamePayBinance())
-                            .filter(code -> code != null && !code.isBlank())
-                            .distinct()
-                            .collect(Collectors.toList());
-
+                .onItem().invoke(paymentCodes ->
                     log.info("Found {} payment methods for country_currency {}: {}",
-                            paymentCodes.size(), countryCurrencyId, paymentCodes);
-
-                    return paymentCodes;
-                })
+                            paymentCodes.size(), countryCurrencyId, paymentCodes)
+                )
                 .onFailure().invoke(error ->
                         log.error("Error querying payment methods for country_currency {}: {}",
                                 countryCurrencyId, error.getMessage())
