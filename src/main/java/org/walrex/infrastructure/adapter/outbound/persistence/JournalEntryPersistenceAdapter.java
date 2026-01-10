@@ -15,6 +15,7 @@ import org.walrex.infrastructure.adapter.outbound.persistence.repository.Journal
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.JournalEntryRepository;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 /**
  * Persistence adapter that implements output ports for JournalEntry.
@@ -126,24 +127,24 @@ public class JournalEntryPersistenceAdapter implements JournalEntryRepositoryPor
     // ==================== JournalEntryQueryPort - Read Operations ====================
 
     @Override
-    public Uni<java.util.Optional<JournalEntry>> findById(Integer id) {
+    public Uni<Optional<JournalEntry>> findById(Integer id) {
         log.debug("Finding journal entry by id: {}", id);
 
         return repository.findById(id)
                 .onItem().transform(entity -> {
                     if (entity == null) {
                         log.debug("Journal entry not found with id: {}", id);
-                        return java.util.Optional.empty();
+                        return Optional.empty();
                     }
 
                     // Only return if not soft-deleted
                     if (entity.getDeletedAt() != null) {
                         log.debug("Journal entry {} is soft-deleted", id);
-                        return java.util.Optional.empty();
+                        return Optional.empty();
                     }
 
                     log.debug("Found journal entry with id: {}", id);
-                    return java.util.Optional.of(mapper.toDomain(entity));
+                    return Optional.of(mapper.toDomain(entity));
                 });
     }
 
