@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.AccountSyncQueryPort;
 import org.walrex.domain.model.AccountingAccount;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
-import org.walrex.infrastructure.adapter.outbound.persistence.entity.AccountingAccountEntity;
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.AccountingAccountMapper;
+import org.walrex.infrastructure.adapter.outbound.persistence.repository.AccountingAccountRepository;
 
 /**
  * Adapter de persistencia para operaciones de sincronización de cuentas contables.
@@ -22,6 +22,9 @@ import org.walrex.infrastructure.adapter.outbound.persistence.mapper.AccountingA
 public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
 
     @Inject
+    AccountingAccountRepository accountRepository;
+
+    @Inject
     AccountingAccountMapper mapper;
 
     @Override
@@ -30,11 +33,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
     public Multi<AccountingAccount> findUnsyncedAccounts() {
         log.debug("Finding unsynced accounts");
 
-        return AccountingAccountEntity
-                .<AccountingAccountEntity>find(
-                        "embeddingsSynced = false AND active = true AND deletedAt IS NULL"
-                )
-                .list()
+        return accountRepository.findAllUnsynced()
                 .onItem().transformToMulti(list -> Multi.createFrom().iterable(list))
                 .onItem().transform(entity -> {
                     log.trace("Found unsynced account: {} ({})", entity.getCode(), entity.getName());
@@ -48,7 +47,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
     public Uni<AccountingAccount> findById(Integer accountId) {
         log.debug("Finding account by ID: {}", accountId);
 
-        return AccountingAccountEntity.<AccountingAccountEntity>findById(accountId)
+        return accountRepository.findById(accountId)
                 .onItem().transform(entity -> {
                     if (entity == null) {
                         log.warn("Account not found: {}", accountId);
@@ -65,7 +64,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
         log.debug("Marking account {} as synced", accountId);
 
         return Panache.withTransaction(() ->
-                AccountingAccountEntity.<AccountingAccountEntity>findById(accountId)
+                accountRepository.findById(accountId)
                         .onItem().transformToUni(entity -> {
                             if (entity == null) {
                                 log.warn("Cannot mark as synced - account not found: {}", accountId);
@@ -91,7 +90,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
         log.debug("Marking account {} as unsynced", accountId);
 
         return Panache.withTransaction(() ->
-                AccountingAccountEntity.<AccountingAccountEntity>findById(accountId)
+                accountRepository.findById(accountId)
                         .onItem().transformToUni(entity -> {
                             if (entity == null) {
                                 log.warn("Cannot mark as unsynced - account not found: {}", accountId);
@@ -116,9 +115,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
     public Uni<Long> countUnsyncedAccounts() {
         log.debug("Counting unsynced accounts");
 
-        return AccountingAccountEntity.count(
-                "embeddingsSynced = false AND active = true AND deletedAt IS NULL"
-        ).onItem().invoke(count ->
+        return accountRepository.countUnsynced().onItem().invoke(count ->
                 log.debug("Found {} unsynced accounts", count)
         );
     }
@@ -130,7 +127,7 @@ public class AccountSyncPersistenceAdapter implements AccountSyncQueryPort {
         log.info("Marking all active accounts as unsynced");
 
         return Panache.withTransaction(() ->
-                AccountingAccountEntity.update(
+                accountRepository.update(
                         "embeddingsSynced = false, updatedAt = ?1 WHERE active = true AND deletedAt IS NULL",
                         java.time.OffsetDateTime.now()
                 ).onItem().invoke(count ->
