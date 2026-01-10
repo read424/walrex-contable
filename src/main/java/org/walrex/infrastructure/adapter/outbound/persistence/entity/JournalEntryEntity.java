@@ -3,9 +3,10 @@ package org.walrex.infrastructure.adapter.outbound.persistence.entity;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.walrex.domain.model.AccountingBookType;
 import org.walrex.domain.model.EntryStatus;
-import org.walrex.infrastructure.adapter.outbound.listener.JournalEntryEntityListener;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -51,10 +52,12 @@ public class JournalEntryEntity extends PanacheEntityBase {
     @Builder.Default
     private List<JournalEntryLineEntity> lines = new ArrayList<>();
 
-    @Column(name = "created_at")
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
     @Column(name = "deleted_at")
