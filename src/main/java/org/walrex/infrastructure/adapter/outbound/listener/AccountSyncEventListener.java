@@ -1,21 +1,22 @@
 package org.walrex.infrastructure.adapter.outbound.listener;
 
-import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
-import io.smallrye.mutiny.Uni;
+import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.hibernate.reactive.mutiny.Mutiny;
 import org.walrex.application.port.input.SyncAccountEmbeddingsUseCase;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.AccountingAccountEntity;
 
 /**
  * Event listener para sincronización automática de embeddings cuando se crean o actualizan cuentas.
  * Se ejecuta de forma asíncrona para no bloquear la operación principal.
+ *
+ * @Unremovable - Requerido porque se accede vía CDI.current() desde AccountEntityListener
  */
 @Slf4j
 @ApplicationScoped
+@Unremovable
 public class AccountSyncEventListener {
 
     @Inject
