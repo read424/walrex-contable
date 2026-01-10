@@ -21,14 +21,15 @@ public class CountryCurrencyPaymentMethodRepository
      * @param countryCurrencyId ID from country_currencies table
      * @return Uni with list of active payment method entities with bank details
      */
-    public Uni<List<CountryCurrencyPaymentMethodEntity>> findActiveByCountryCurrencyId(Long countryCurrencyId) {
-        return find("select ccpm from CountryCurrencyPaymentMethodEntity ccpm " +
-                   "join fetch ccpm.bank b " +
+    public Uni<List<String>> findActiveByCountryCurrencyId(Long countryCurrencyId) {
+        return find("select b.namePayBinance from CountryCurrencyPaymentMethodEntity ccpm " +
+                   "join ccpm.bank b " +
                    "where ccpm.countryCurrency.id = ?1 " +
                    "and ccpm.isActive = '1' " +
                    "and b.status = '1' " +
                    "and b.namePayBinance is not null",
                    countryCurrencyId)
+                .project(String.class)
                 .list();
     }
 
@@ -38,18 +39,19 @@ public class CountryCurrencyPaymentMethodRepository
      * @param countryCurrencyIds List of country_currencies IDs
      * @return Uni with list of active payment method entities
      */
-    public Uni<List<CountryCurrencyPaymentMethodEntity>> findActiveByCountryCurrencyIds(List<Long> countryCurrencyIds) {
+    public Uni<List<String>> findActiveByCountryCurrencyIds(List<Long> countryCurrencyIds) {
         if (countryCurrencyIds == null || countryCurrencyIds.isEmpty()) {
             return Uni.createFrom().item(List.of());
         }
 
-        return find("select ccpm from CountryCurrencyPaymentMethodEntity ccpm " +
-                   "join fetch ccpm.bank b " +
+        return find("select b.namePayBinance from CountryCurrencyPaymentMethodEntity ccpm " +
+                   "join ccpm.bank b " +
                    "where ccpm.countryCurrency.id in (?1) " +
                    "and ccpm.isActive = '1' " +
                    "and b.status = '1' " +
                    "and b.namePayBinance is not null",
                    countryCurrencyIds)
+                .project(String.class)
                 .list();
     }
 }
