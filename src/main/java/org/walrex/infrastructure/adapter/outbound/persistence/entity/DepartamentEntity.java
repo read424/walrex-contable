@@ -12,10 +12,15 @@ import java.time.OffsetDateTime;
 @ToString
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "departament", uniqueConstraints = {
-        @UniqueConstraint(name = "departament_name_uk", columnNames = {"nombre"}),
-        @UniqueConstraint(name = "departament_code_uk", columnNames = {"codigo"})
-})
+@Table(name = "departament",
+        uniqueConstraints = {
+            @UniqueConstraint(name = "departament_name_uk", columnNames = {"nombre"}),
+            @UniqueConstraint(name = "departament_code_uk", columnNames = {"codigo"}),
+        },
+        indexes = {
+            @Index(name="idx_departament_name_lower", columnList = "lower(name_departament::text)")
+        }
+)
 public class DepartamentEntity extends PanacheEntityBase {
 
     @Id

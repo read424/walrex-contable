@@ -8,13 +8,16 @@ import org.walrex.application.port.input.CalculateExchangeRateUseCase;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.application.port.output.PaymentMethodQueryPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
+import org.walrex.domain.exception.ExchangeRateTimeoutException;
 import org.walrex.domain.model.ExchangeCalculation;
 import org.walrex.domain.model.ExchangeRate;
 import org.walrex.domain.model.RemittanceRoute;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Servicio de dominio que implementa la lógica de cálculo de cambio de divisas.
@@ -36,6 +39,10 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
     private static final int TOP_PRICES_LIMIT = 5;
     private static final int SCALE = 8;
 
+    // Timeout de 25 segundos para el cálculo completo
+    // (menor que el timeout de 30s del RestClient para detectar antes)
+    private static final Duration CALCULATION_TIMEOUT = Duration.ofSeconds(25);
+
     private final RemittanceRouteOutputPort remittanceRoutePort;
     private final PaymentMethodQueryPort paymentMethodPort;
     private final ExchangeRateProviderPort exchangeRateProvider;
@@ -51,7 +58,23 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
                 amount, baseCurrency, quoteCurrency, margin);
 
         return findRemittanceRoute(baseCurrency, quoteCurrency)
-                .flatMap(route -> calculateCrossRate(amount, route, margin));
+                .flatMap(route -> calculateCrossRate(amount, route, margin))
+                // Aplicar timeout proactivo de 25 segundos
+                .ifNoItem().after(CALCULATION_TIMEOUT).failWith(() -> {
+                    log.error("Exchange rate calculation timed out after {} seconds for {} -> {}",
+                            CALCULATION_TIMEOUT.getSeconds(), baseCurrency, quoteCurrency);
+                    return new ExchangeRateTimeoutException(
+                            String.format("El cálculo de tipo de cambio excedió el tiempo máximo de espera (%d segundos). " +
+                                    "Por favor, intente nuevamente.", CALCULATION_TIMEOUT.getSeconds()));
+                })
+                // Convertir TimeoutException de operaciones reactivas
+                .onFailure(TimeoutException.class).transform(error -> {
+                    log.error("Reactive timeout during exchange rate calculation for {} -> {}",
+                            baseCurrency, quoteCurrency, error);
+                    return new ExchangeRateTimeoutException(
+                            String.format("El cálculo de tipo de cambio excedió el tiempo máximo de espera. " +
+                                    "Por favor, intente nuevamente."), error);
+                });
     }
 
     /**
