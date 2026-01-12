@@ -19,6 +19,7 @@ import org.walrex.application.dto.request.CreateProductBrandRequest;
 import org.walrex.application.dto.response.ErrorResponse;
 import org.walrex.application.dto.response.ProductBrandResponse;
 import org.walrex.application.port.input.CreateProductBrandUseCase;
+import org.walrex.application.port.input.ListAllProductBrandUseCase;
 import org.walrex.application.port.input.ListProductBrandUseCase;
 import org.walrex.domain.exception.DuplicateProductBrandException;
 import org.walrex.infrastructure.adapter.inbound.mapper.ProductBrandMapper;
@@ -38,6 +39,9 @@ public class ProductBrandResource {
 
     @Inject
     ListProductBrandUseCase listProductBrandUseCase;
+
+    @Inject
+    ListAllProductBrandUseCase listAllProductBrandUseCase;
 
     @Inject
     ProductBrandMapper productBrandMapper;
@@ -87,6 +91,23 @@ public class ProductBrandResource {
                             .toList();
                     return Response.ok(responses).build();
                 })
+                .onFailure()
+                .recoverWithItem(this::mapExceptionToResponse);
+    }
+
+    @GET
+    @Path("/all")
+    @WithTransaction
+    @Operation(summary = "Listar todas las marcas sin paginación", description = "Obtiene todas las marcas de producto sin paginación (optimizado para selects con caché de 15 minutos)")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Lista completa de marcas obtenida exitosamente", content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ProductBrandResponse.class)
+            )),
+            @APIResponse(responseCode = "500", description = "Error interno del servidor")
+    })
+    public Uni<Response> listAll() {
+        return listAllProductBrandUseCase.findAll()
+                .map(brands -> Response.ok(brands).build())
                 .onFailure()
                 .recoverWithItem(this::mapExceptionToResponse);
     }
