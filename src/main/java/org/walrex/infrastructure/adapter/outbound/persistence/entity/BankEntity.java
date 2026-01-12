@@ -33,6 +33,7 @@ public class BankEntity extends PanacheEntityBase {
     @Column(name = "id_country", nullable = false)
     private Integer idCountry;
 
+    @Builder.Default
     @Column(name = "status", length = 1, nullable = false)
     private String status = "1";
 

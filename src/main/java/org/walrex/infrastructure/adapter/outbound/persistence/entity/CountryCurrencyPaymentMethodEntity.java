@@ -35,6 +35,7 @@ public class CountryCurrencyPaymentMethodEntity extends PanacheEntityBase {
     @JoinColumn(name = "id_bank", nullable = false)
     private BankEntity bank;
 
+    @Builder.Default
     @Column(name = "is_active", length = 1, nullable = false)
     private String isActive = "1";
 
