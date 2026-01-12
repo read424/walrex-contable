@@ -21,6 +21,7 @@ import org.walrex.application.dto.request.ExchangeRateRequest;
 import org.walrex.application.dto.response.ErrorResponse;
 import org.walrex.application.dto.response.ExchangeRateResponse;
 import org.walrex.application.port.input.CalculateExchangeRateUseCase;
+import org.walrex.domain.exception.ExchangeRateTimeoutException;
 import org.walrex.infrastructure.adapter.inbound.mapper.ExchangeRateMapper;
 
 /**
@@ -72,6 +73,14 @@ public class ExchangeRateCalculationResource {
                             mediaType = MediaType.APPLICATION_JSON,
                             schema = @Schema(implementation = ErrorResponse.class)
                     )
+            ),
+            @APIResponse(
+                    responseCode = "504",
+                    description = "Tiempo de espera agotado - El cálculo excedió el tiempo máximo permitido",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
             )
     })
     public Uni<Response> calculateExchangeRate(@Valid ExchangeRateRequest request) {
@@ -96,6 +105,17 @@ public class ExchangeRateCalculationResource {
     private Response mapExceptionToResponse(Throwable throwable) {
         log.error("Error calculating exchange rate", throwable);
 
+        // Timeout: 504 Gateway Timeout
+        if (throwable instanceof ExchangeRateTimeoutException) {
+            return Response.status(Response.Status.GATEWAY_TIMEOUT)
+                    .entity(new ErrorResponse(
+                            Response.Status.GATEWAY_TIMEOUT.getStatusCode(),
+                            "Gateway Timeout",
+                            throwable.getMessage()))
+                    .build();
+        }
+
+        // Validación de entrada: 400 Bad Request
         if (throwable instanceof IllegalArgumentException) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new ErrorResponse(
@@ -105,6 +125,7 @@ public class ExchangeRateCalculationResource {
                     .build();
         }
 
+        // Error del proveedor: 500 Internal Server Error
         if (throwable instanceof IllegalStateException) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(new ErrorResponse(
@@ -114,6 +135,7 @@ public class ExchangeRateCalculationResource {
                     .build();
         }
 
+        // Error genérico: 500 Internal Server Error
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity(new ErrorResponse(
                         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
