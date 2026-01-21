@@ -75,6 +75,13 @@ quarkus:
         enabled: true
       mp-metrics:
         enabled: true
+  mailer:
+    from: no-reply@walrex.pe
+    host: smtp.gmail.com
+    port: 587
+    start-tls: REQUIRED
+    username: XXXXXXXX
+    password: XXXXXXXX
   log:
     level: INFO
     min-level: TRACE
@@ -178,8 +185,12 @@ quarkus:
       logging:
         scope: request-response
         body-limit: 1024
+    face-match-service:
+      url: ${FACE_MATCH_SERVICE_URL:http://127.0.0.1:8000}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 60000
+      connect-timeout: 10000
 
-    
     # Qdrant native client configuration (used by QdrantCollectionInitializer)
     qdrant:
       dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
