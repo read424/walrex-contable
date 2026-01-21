@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Código de verificación</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 520px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .header {
+            background: #0f62fe;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 32px;
+            color: #333333;
+        }
+        .otp {
+            font-size: 32px;
+            letter-spacing: 6px;
+            font-weight: bold;
+            text-align: center;
+            margin: 24px 0;
+            color: #0f62fe;
+        }
+        .footer {
+            padding: 16px;
+            font-size: 12px;
+            color: #777777;
+            text-align: center;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>Verificación de seguridad</h2>
+    </div>
+    <div class="content">
+        <p>Hola,</p>
+
+        <p>
+            Usa el siguiente código para completar el proceso de
+            <strong>{purpose}</strong>.
+        </p>
+
+        <div class="otp">{otp}</div>
+
+        <p>
+            Este código expirará en <strong>{expiresMinutes} minutos</strong>.
+            No lo compartas con nadie.
+        </p>
+
+        <p>Si no solicitaste este código, puedes ignorar este mensaje.</p>
+    </div>
+    <div class="footer">
+        © 2026 Tu Empresa · Seguridad primero
+    </div>
+</div>
+</body>
+</html>
