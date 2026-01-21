@@ -14,8 +14,7 @@ import java.util.List;
  */
 @Mapper(
     componentModel = MappingConstants.ComponentModel.CDI,
-    unmappedTargetPolicy = ReportingPolicy.IGNORE,
-    injectionStrategy = InjectionStrategy.CONSTRUCTOR
+    unmappedTargetPolicy = ReportingPolicy.IGNORE
 )
 public interface BankMapper {
 
