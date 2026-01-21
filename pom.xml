@@ -128,7 +128,29 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-config-yaml</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-mailer</artifactId>
+            <version>3.30.6</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-qute</artifactId>
+            <version>3.30.6</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp</artifactId>
@@ -247,7 +269,7 @@
                 <configuration>
                     <parameters>true</parameters>
                     <compilerArgs>
-                        <arg>-Amapstruct.defaultComponentModel=jakarta-cdi</arg>
+                        <arg>-Amapstruct.defaultComponentModel=cdi</arg>
                     </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
