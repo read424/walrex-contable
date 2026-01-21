@@ -20,8 +20,6 @@ import org.walrex.application.dto.response.ErrorResponse;
 import org.walrex.application.dto.response.JournalLineSuggestionResponse;
 import org.walrex.application.port.input.AnalyzeAndSuggestJournalLineUseCase;
 
-import java.util.List;
-
 /**
  * REST endpoint para sugerencias de líneas de asiento contable basadas en análisis de documentos.
  *
