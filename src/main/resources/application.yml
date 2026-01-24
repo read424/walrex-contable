@@ -76,12 +76,12 @@ quarkus:
       mp-metrics:
         enabled: true
   mailer:
-    from: no-reply@walrex.pe
-    host: smtp.gmail.com
-    port: 587
-    start-tls: REQUIRED
-    username: XXXXXXXX
-    password: XXXXXXXX
+    from: developer@texlamerced.com
+    host: mail.texlamerced.com
+    port: 465
+    ssl: true
+    username: developer@texlamerced.com
+    password: ${PASSWORD_EMAIL_DEV:p4s52024}
   log:
     level: INFO
     min-level: TRACE
@@ -225,3 +225,9 @@ rag:
     auto-sync-enabled: true
     sync-on-create: true
     sync-on-update: false
+
+app:
+  registration:
+    token:
+      secret: ${REGISTRATION_TOKEN_SECRET:your-super-secret-key-min-32-chars}
+      expiration-minutes: 10
