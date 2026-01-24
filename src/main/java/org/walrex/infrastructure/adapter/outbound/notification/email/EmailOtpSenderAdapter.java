@@ -7,12 +7,17 @@ import io.quarkus.qute.Template;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
+import org.jboss.logging.Logger;
 import org.walrex.application.port.output.OtpSenderPort;
 import org.walrex.domain.model.OtpChannel;
 import org.walrex.domain.model.OtpPurpose;
 
+@Slf4j
 @ApplicationScoped
 public class EmailOtpSenderAdapter implements OtpSenderPort {
+
+    private static final Logger LOG = Logger.getLogger(EmailOtpSenderAdapter.class);
 
     @Inject
     ReactiveMailer mailer;
@@ -32,6 +37,9 @@ public class EmailOtpSenderAdapter implements OtpSenderPort {
             return Uni.createFrom().voidItem();
         }
 
+        LOG.infof("TEMPORARY DEBUG: OTP for %s is %s", target, otp);
+        LOG.infof("Attempting to send OTP email for purpose %s to %s", purpose, target);
+
         String html = otpEmail
                 .data("otp", otp)
                 .data("purpose", purpose.name().replace("_", " ").toLowerCase())
@@ -43,8 +51,10 @@ public class EmailOtpSenderAdapter implements OtpSenderPort {
                         target,
                         subjectByPurpose(purpose),
                         html
-                )
-        ).replaceWithVoid();
+                ))
+                .onItem().invoke(() -> LOG.infof("Successfully sent OTP email for purpose %s to %s", purpose, target))
+                .onFailure().invoke(e -> LOG.errorf(e, "Failed to send OTP email for purpose %s to %s. Check mailer configuration.", purpose, target))
+                .replaceWithVoid();
     }
 
     private String subjectByPurpose(OtpPurpose purpose) {
