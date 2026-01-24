@@ -14,7 +14,7 @@ import org.walrex.application.dto.response.OtpResponse;
 import org.walrex.application.dto.response.OtpValidationResponse;
 import org.walrex.application.port.input.OtpUseCase;
 
-@Path("/otp")
+@Path("/api/v1/otp")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @ApplicationScoped
