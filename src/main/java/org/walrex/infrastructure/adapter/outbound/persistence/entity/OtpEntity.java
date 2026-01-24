@@ -16,9 +16,16 @@ import java.time.Instant;
 @Data
 @Entity
 @Table(name = "otp",
-        indexes = {
-                @Index(name = "idx_otp_reference_purpose", columnList = "referenceId,purpose")
-        }
+    indexes = {
+        @Index(
+            name = "idx_otp_reference_purpose",
+            columnList = "reference_id, purpose"
+        ),
+        @Index(
+            name = "idx_otp_target_active",
+            columnList = "target, used, expires_at"
+        )
+    }
     )
 public class OtpEntity extends PanacheEntityBase {
 
@@ -26,20 +33,20 @@ public class OtpEntity extends PanacheEntityBase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "reference_id", length = 64, nullable = false, unique = true)
     public String referenceId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "purpose", length = 32, nullable = false)
     private OtpPurpose purpose;
 
-    @Column(nullable = false)
+    @Column(length = 128, nullable = false)
     public String target;
 
-    @Column(nullable = false)
+    @Column(name = "otp_hash", length = 128, nullable = false)
     public String otpHash;
 
-    @Column(nullable = false)
+    @Column(name = "expires_at", nullable = false)
     public Instant expiresAt;
 
     @Column(nullable = false)
