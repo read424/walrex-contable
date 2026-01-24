@@ -12,8 +12,9 @@ import java.time.Instant;
 @ToString
 public class Otp {
     private String referenceId;
+    private OtpPurpose purpose;
     private String target;
-    private String  otpHash;
+    private String otpHash;
     private Instant expiresAt;
     private boolean used;
 
