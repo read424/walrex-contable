@@ -34,6 +34,13 @@ public class OtpPersistenceAdapter implements OtpRepositoryPort {
     }
 
     @Override
+    public Uni<Otp> findActiveByTargetAndPurpose(String target, OtpPurpose purpose) {
+        return repository
+                .findActiveByTargetAndPurpose(target, purpose)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Uni<Void> update(Otp otp) {
         return save(otp).replaceWithVoid();
     }

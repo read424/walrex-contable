@@ -23,12 +23,13 @@ public final class OtpFactory {
             case MFA_SETUP -> Instant.now().plusSeconds(900);
         };
 
-        return new Otp(
-                UUID.randomUUID().toString(),
-                target,
-                otpHash,
-                expiresAt,
-                false
-        );
+        return Otp.builder()
+                .referenceId(UUID.randomUUID().toString())
+                .purpose(purpose)
+                .target(target)
+                .otpHash(otpHash)
+                .expiresAt(expiresAt)
+                .used(false)
+                .build();
     }
 }
