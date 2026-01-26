@@ -42,6 +42,9 @@ public class OtpPersistenceAdapter implements OtpRepositoryPort {
 
     @Override
     public Uni<Void> update(Otp otp) {
-        return save(otp).replaceWithVoid();
+        OtpEntity entity = mapper.toEntity(otp);
+        return repository.getSession()
+                .flatMap(session -> session.merge(entity))
+                .replaceWithVoid();
     }
 }
