@@ -6,5 +6,11 @@ public interface RegistrationTokenPort {
 
     RegistrationToken generate(String target, String purpose);
 
-    boolean validate(String token, String expectedTarget);
+    /**
+     * Valida el token JWT y extrae el claim target.
+     * @param token El token JWT a validar
+     * @return El valor del claim "target" si el token es válido
+     * @throws org.walrex.domain.exception.InvalidTokenException si el token es inválido o expirado
+     */
+    String validateAndExtractTarget(String token);
 }
