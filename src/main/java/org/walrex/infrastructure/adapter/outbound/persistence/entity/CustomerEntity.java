@@ -74,7 +74,7 @@ public class CustomerEntity extends PanacheEntityBase {
     @Column(name = "id_distrito")
     private Integer idCountryDistrict;
 
-    @Column(name = "phone_mobile")
+    @Column(name = "phonemobile")
     private String phoneMobile;
 
     @Column(name = "phone_number")

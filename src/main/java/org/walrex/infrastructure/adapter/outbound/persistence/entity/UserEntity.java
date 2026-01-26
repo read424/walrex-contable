@@ -43,8 +43,8 @@ public class UserEntity extends PanacheEntityBase {
     private OffsetDateTime pinLockedUntil;
 
     @Builder.Default
-    @Column(nullable = false)
-    private Boolean active = true;
+    @Column(name = "status", nullable = false)
+    private Integer active = 1;
 
     @Builder.Default
     @Column(name = "mfa_enabled", nullable = false)

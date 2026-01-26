@@ -11,6 +11,7 @@ import org.walrex.infrastructure.adapter.outbound.persistence.entity.UserEntity;
 public interface UserEntityMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "clientId", source = "customerId")
     UserEntity toEntity(User user);
 
     User toDomain(UserEntity entity);

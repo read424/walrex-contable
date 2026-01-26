@@ -28,7 +28,7 @@ public class User {
     private OffsetDateTime pinLockedUntil;
 
     /** Estado */
-    private boolean active;
+    private Integer active;
 
     /** MFA / biometría (futuro) */
     private boolean mfaEnabled;

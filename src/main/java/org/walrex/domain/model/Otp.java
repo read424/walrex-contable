@@ -11,6 +11,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @ToString
 public class Otp {
+    private Long id;
     private String referenceId;
     private OtpPurpose purpose;
     private String target;

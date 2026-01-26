@@ -30,7 +30,7 @@ public interface RegisterUserMapper {
     @Mapping(target = "usernameType", source = "request.identificationMethod", qualifiedByName = "mapUsernameType")
     @Mapping(target = "pinHash", source = "request.pinHash")
     @Mapping(target = "pinAttempts", constant = "0")
-    @Mapping(target = "active", constant = "true")
+    @Mapping(target = "active", constant = "1")
     User toUser(RegisterUserRequest request, Integer customerId);
 
     @Named("buildLastName")
