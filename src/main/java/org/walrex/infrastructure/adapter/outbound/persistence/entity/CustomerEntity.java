@@ -91,4 +91,8 @@ public class CustomerEntity extends PanacheEntityBase {
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
+
+    @Builder.Default
+    @Column(name = "kyc_status")
+    public String kycStatus = "PENDING";
 }
