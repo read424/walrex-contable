@@ -10,9 +10,9 @@ import org.walrex.infrastructure.adapter.outbound.persistence.entity.UserEntity;
 @Mapper(componentModel = MappingConstants.ComponentModel.CDI, unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserEntityMapper {
 
-    @Mapping(target = "id", ignore = true)
     @Mapping(target = "clientId", source = "customerId")
     UserEntity toEntity(User user);
 
+    @Mapping(source = "clientId", target = "customerId")
     User toDomain(UserEntity entity);
 }
