@@ -229,5 +229,14 @@ rag:
 app:
   registration:
     token:
-      secret: ${REGISTRATION_TOKEN_SECRET:your-super-secret-key-min-32-chars}
+      secret: ${REGISTRATION_TOKEN_SECRET}
       expiration-minutes: 10
+  login:
+    max-attempts: 5
+    lockout-minutes: 15
+
+mp:
+  jwt:
+    verify:
+      issuer: https://walrex.org/issuer
+    secret: ${JWT_SECRET}
