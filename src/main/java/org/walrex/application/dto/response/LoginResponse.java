@@ -1,0 +1,18 @@
+package org.walrex.application.dto.response;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Builder;
+
+@Builder
+public record LoginResponse(
+        @JsonProperty("access_token")
+        String accessToken,
+        @JsonProperty("expires_in")
+        long expiresIn,
+        @JsonProperty("refresh_token")
+        String refreshToken,
+        @JsonProperty("refresh_expires_in")
+        long refreshExpiresIn,
+        @JsonProperty("token_type")
+        String tokenType
+) {}
