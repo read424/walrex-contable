@@ -95,4 +95,8 @@ public class CustomerEntity extends PanacheEntityBase {
     @Builder.Default
     @Column(name = "kyc_status")
     public String kycStatus = "PENDING";
+
+    @Builder.Default
+    @Column(name = "kyc_level")
+    public Integer kycLevel = 0;
 }
