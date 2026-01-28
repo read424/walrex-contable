@@ -32,6 +32,7 @@ import java.util.List;
 public class CountryService implements
         CreateCountryUseCase,
         ListCountryUseCase,
+        ListAllCountryUseCase,
         GetCountryUseCase,
         UpdateCountryUseCase,
         DeleteCountryUseCase,
@@ -52,6 +53,9 @@ public class CountryService implements
     CountryDtoMapper countryDtoMapper;
 
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+
+    // TTL del cache: 12 horas para listado completo (/all endpoint)
+    private static final Duration CACHE_ALL_TTL = Duration.ofHours(12);
 
     /**
      * Crea un nuevo pais.
@@ -336,6 +340,57 @@ public class CountryService implements
                         return countryCachePort.invalidateAll();
                     }
                     return Uni.createFrom().voidItem();
+                });
+    }
+
+    // ==================== ListAllCountryUseCase ====================
+
+    /**
+     * Obtiene todos los países activos sin paginación.
+     *
+     * Implementa cache-aside pattern con TTL de 12 horas:
+     * 1. Intenta obtener del cache
+     * 2. Si no existe, consulta la DB
+     * 3. Cachea el resultado por 12 horas
+     * 4. Devuelve el resultado
+     *
+     * El cache se invalida automáticamente en create/update/delete.
+     *
+     * @return Uni con lista completa de países
+     */
+    @Override
+    public Uni<List<CountryResponse>> findAll() {
+        log.info("Listing all countries (no pagination)");
+
+        // Generar clave única de cache
+        String cacheKey = CountryCacheKeyGenerator.generateKeyForAll();
+
+        // Cache-aside pattern
+        return countryCachePort.<CountryResponse>getList(cacheKey)
+                .onItem().transformToUni(cachedResult -> {
+                    if (cachedResult != null) {
+                        log.debug("Returning cached result for key: {}", cacheKey);
+                        return Uni.createFrom().item(cachedResult);
+                    }
+
+                    // Cache miss - consultar DB
+                    log.debug("Cache miss for key: {}. Querying database.", cacheKey);
+                    return fetchAllCountriesAndCache(cacheKey);
+                });
+    }
+
+    /**
+     * Consulta la DB y cachea el resultado para endpoint /all.
+     */
+    private Uni<List<CountryResponse>> fetchAllCountriesAndCache(String cacheKey) {
+        return countryQueryPort.streamAll()
+                .onItem().transform(countryDtoMapper::toResponse)
+                .collect().asList()
+                .call(result -> {
+                    // Cachear el resultado por 12 horas (fire-and-forget)
+                    log.debug("Caching result for key: {} with TTL of {} hours",
+                            cacheKey, CACHE_ALL_TTL.toHours());
+                    return countryCachePort.putList(cacheKey, result, CACHE_ALL_TTL);
                 });
     }
 }

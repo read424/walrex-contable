@@ -180,6 +180,56 @@ public class CountryRouter {
     }
 
     /**
+     * GET /api/v1/countries/all - List all countries without pagination (cached)
+     */
+    @Route(path = "/all", methods = Route.HttpMethod.GET)
+    @Operation(
+            summary = "Listar todos los países sin paginación",
+            description = "Obtiene todos los países activos sin paginación. " +
+                    "Optimizado para componentes de selección (dropdowns). " +
+                    "Los resultados se cachean en Redis por 12 horas."
+    )
+    @APIResponses({
+            @APIResponse(
+                    responseCode = "200",
+                    description = "Lista completa de países obtenida exitosamente",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = CountryResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Lista de países",
+                                    value = """
+                        [
+                            {
+                                "id": 1,
+                                "alphabeticCode": "PER",
+                                "numericCode": "604",
+                                "name": "PERU",
+                                "active": true
+                            },
+                            {
+                                "id": 2,
+                                "alphabeticCode": "VEN",
+                                "numericCode": "862",
+                                "name": "VENEZUELA",
+                                "active": true
+                            }
+                        ]
+                        """
+                            )
+                    )
+            ),
+            @APIResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
+    public Uni<Void> listAll(RoutingContext rc) {
+        return countryHandler.listAll(rc);
+    }
+
+    /**
      * GET /api/v1/countries/{id} - Get a country by ID
      */
     @Route(path = "/:id", methods = Route.HttpMethod.GET)
