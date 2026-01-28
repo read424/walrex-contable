@@ -182,7 +182,7 @@ public class CountryRouter {
     /**
      * GET /api/v1/countries/all - List all countries without pagination (cached)
      */
-    @Route(path = "/all", methods = Route.HttpMethod.GET)
+    @Route(path = "/all", methods = Route.HttpMethod.GET, order = 1)
     @Operation(
             summary = "Listar todos los países sin paginación",
             description = "Obtiene todos los países activos sin paginación. " +
@@ -365,7 +365,7 @@ public class CountryRouter {
      * available
      * Query params: alphabeticCode, numericCode, or name
      */
-    @Route(path = "/check-availability", methods = Route.HttpMethod.GET)
+    @Route(path = "/check-availability", methods = Route.HttpMethod.GET, order = 1)
     @Operation(
             summary = "Verificar disponibilidad de un campo",
             description = "Verifica si un valor específico (código alfabético, código numérico o nombre) " +
