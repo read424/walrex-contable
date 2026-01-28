@@ -22,6 +22,7 @@ public interface RegisterUserMapper {
     @Mapping(target = "isPEP", source = "isPoliticallyExposed", qualifiedByName = "mapPep")
     @Mapping(target = "email", source = ".", qualifiedByName = "resolveEmail")
     @Mapping(target = "phoneNumber", source = ".", qualifiedByName = "resolvePhone")
+    @Mapping(target = "idCountryResidence", source = "countryId")
     Customer toCustomer(RegisterUserRequest registerUserRequest);
 
     @Mapping(target = "id", ignore = true)
