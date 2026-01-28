@@ -70,7 +70,7 @@ public class RegisterUserService implements RegisterUserUseCase {
                                 log.info("Customer saved with ID: {}", customerId);
 
                                 // PASO 4: Crear wallets por defecto para el cliente
-                                Integer countryId = customer.getIdCountryResidence();
+                                Integer countryId = request.getCountryId();
                                 return createDefaultWallets(customerId, countryId)
                                         .onItem().transformToUni(wallets -> {
                                             log.info("Created {} default wallets for customerId: {}", wallets.size(), customerId);
