@@ -63,7 +63,7 @@ public class RefreshTokenService implements RefreshTokenUseCase {
                             .onItem().transformToUni(loginResponse -> {
                                 RefreshToken newRefreshToken = RefreshToken.builder()
                                         .userId(user.getId())
-                                        .refreshTokenHash(hashToken(loginResponse.refreshToken()))
+                                        .refreshTokenHash(hashToken(loginResponse.getRefreshToken()))
                                         .expiresAt(OffsetDateTime.now().plusDays(15))
                                         .build();
 
