@@ -54,6 +54,9 @@ public class CountryHandler {
     @Inject
     CheckAvailabilityCountryUseCase checkAvailabilityCountryUseCase;
 
+    @Inject
+    ListAllCountryUseCase listAllCountryUseCase;
+
     /**
      * POST /api/v1/countries - Create new country
      */
@@ -136,6 +139,17 @@ public class CountryHandler {
             handleBadRequest(rc, "Invalid query parameters: " + e.getMessage());
             return Uni.createFrom().voidItem();
         }
+    }
+
+    /**
+     * GET /api/v1/countries/all - List all countries without pagination (cached for 12 hours)
+     */
+    @WithSession
+    public Uni<Void> listAll(RoutingContext rc) {
+        return listAllCountryUseCase.findAll()
+                .onItem().invoke(countries -> sendJson(rc, HttpResponseStatus.OK, countries))
+                .onFailure().invoke(error -> handleError(rc, error))
+                .replaceWithVoid();
     }
 
     /**

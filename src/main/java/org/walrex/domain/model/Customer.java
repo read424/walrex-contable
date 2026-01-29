@@ -58,4 +58,10 @@ public class Customer {
     private OffsetDateTime updatedAt;
 
     private OffsetDateTime deletedAt;
+
+    @Builder.Default
+    private String kycStatus = "PENDING";
+
+    @Builder.Default
+    private Integer kycLevel = 0;
 }

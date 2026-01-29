@@ -51,4 +51,7 @@ public class RegisterUserRequest {
 
     @NotBlank(message = "El PIN es requerido")
     private String pinHash;
+
+    @NotNull(message = "El país es requerido")
+    private Integer countryId;
 }

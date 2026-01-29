@@ -23,6 +23,7 @@ import java.util.HexFormat;
 public class CountryCacheKeyGenerator {
 
     private static final String CACHE_PREFIX = "country:list:";
+    private static final String ALL_ACTIVE = "country:all:active";
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -64,12 +65,22 @@ public class CountryCacheKeyGenerator {
     }
 
     /**
-     * Genera clave para invalidar todo el patrón de currencies.
+     * Genera una clave de cache para listar todos los países activos.
+     * Usada por el endpoint /all.
      *
-     * @return Patrón para invalidar todas las claves de currency
+     * @return Clave de cache para listado completo
+     */
+    public static String generateKeyForAll() {
+        return ALL_ACTIVE;
+    }
+
+    /**
+     * Genera clave para invalidar todo el patrón de countries.
+     *
+     * @return Patrón para invalidar todas las claves de country
      */
     public static String getInvalidationPattern() {
-        return CACHE_PREFIX + "*";
+        return "country:*";
     }
 
     /**

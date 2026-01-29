@@ -11,6 +11,8 @@ import org.walrex.infrastructure.adapter.outbound.persistence.entity.CustomerEnt
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.CustomerEntityMapper;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.CustomerRepository;
 
+import java.util.Optional;
+
 @Slf4j
 @ApplicationScoped
 public class ClientRepositoryAdapter implements ClientRepositoryPort {
@@ -48,6 +50,18 @@ public class ClientRepositoryAdapter implements ClientRepositoryPort {
                                 log.info("Customer saved with ID: {}", savedEntity.getId());
                                 return savedEntity.getId();
                             });
+                });
+    }
+
+    @Override
+    public Uni<Optional<Customer>> findById(Integer id) {
+        log.debug("Finding customer by ID: {}", id);
+        return customerRepository.findById(id)
+                .onItem().transform(entity -> {
+                    if (entity == null) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(customerEntityMapper.toDomain(entity));
                 });
     }
 }

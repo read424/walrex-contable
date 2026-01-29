@@ -1,18 +1,70 @@
 package org.walrex.application.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
 @Builder
-public record LoginResponse(
-        @JsonProperty("access_token")
-        String accessToken,
-        @JsonProperty("expires_in")
-        long expiresIn,
-        @JsonProperty("refresh_token")
-        String refreshToken,
-        @JsonProperty("refresh_expires_in")
-        long refreshExpiresIn,
-        @JsonProperty("token_type")
-        String tokenType
-) {}
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginResponse {
+
+    private String accessToken;
+    private Long expiresIn;
+    private String refreshToken;
+    private Long refreshExpiresIn;
+    private String tokenType;
+    private UserInfo user;
+    private List<WalletInfo> wallets;
+    private List<TransactionInfo> recentTransactions;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserInfo {
+        private Integer id;
+        private String name;
+        private KycInfo kyc;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class KycInfo {
+        private String status;
+        private Integer level;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WalletInfo {
+        private Long walletId;
+        private String country;
+        private String currency;
+        private BigDecimal balance;
+        private Boolean viewBalance;
+        private Boolean isDefault;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TransactionInfo {
+        private String id;
+        private String type;
+        private BigDecimal amount;
+        private String currency;
+        private String counterparty;
+        private String createdAt;
+    }
+}
