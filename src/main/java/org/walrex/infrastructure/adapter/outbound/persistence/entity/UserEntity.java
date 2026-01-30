@@ -47,6 +47,20 @@ public class UserEntity extends PanacheEntityBase {
     private Integer active = 1;
 
     @Builder.Default
+    @Column(name = "device_trusted")
+    private Boolean deviceTrusted = false;
+
+    @Builder.Default
+    @Column(name = "biometric_enabled")
+    private Boolean biometricEnabled = false;
+
+    @Column(name = "biometric_enrolled_at")
+    private OffsetDateTime biometricEnrolledAt;
+
+    @Column(name = "biometric_type")
+    private String biometricType;
+
+    @Builder.Default
     @Column(name = "mfa_enabled", nullable = false)
     private Boolean mfaEnabled = false;
 

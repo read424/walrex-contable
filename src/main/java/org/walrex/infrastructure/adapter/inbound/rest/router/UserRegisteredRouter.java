@@ -25,6 +25,9 @@ public class UserRegisteredRouter {
     @Inject
     UserRegistrationHandler userRegistrationHandler;
 
+    @Inject
+    UserBiometricHandler userBiometricHandler;
+
     @Route(path = "/register", methods = Route.HttpMethod.POST)
     @Operation(
             summary = "Crear cuenta de usuario",
@@ -55,5 +58,10 @@ public class UserRegisteredRouter {
     )
     public Uni<Void> create(RoutingContext rc) {
         return userRegistrationHandler.createdUser(rc);
+    }
+
+    @Route(path = "/biometric", methods = Route.HttpMethod.PUT)
+    public Uni<Void> biometric(RoutingContext rc) {
+        return userBiometricHandler.updateBiometric(rc);
     }
 }
