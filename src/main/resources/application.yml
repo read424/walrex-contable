@@ -2,6 +2,8 @@ quarkus:
   application:
     name: admon-catalogo
   http:
+    auth:
+      proactive: false
     body:
       uploads-directory: tmp/uploads
       merge-form-attributes: true
@@ -240,3 +242,8 @@ mp:
     verify:
       issuer: https://walrex.org/issuer
     secret: ${JWT_SECRET}
+
+smallrye:
+  jwt:
+    verify:
+      algorithm: HS256

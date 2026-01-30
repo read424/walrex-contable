@@ -23,6 +23,12 @@ public class User {
     /** Hash del PIN */
     private String pinHash;
 
+    private Boolean biometricEnabled;
+
+    private String biometricType;
+
+    private java.time.OffsetDateTime biometricEnrolledAt;
+
     /** Seguridad */
     private int pinAttempts;
     private OffsetDateTime pinLockedUntil;

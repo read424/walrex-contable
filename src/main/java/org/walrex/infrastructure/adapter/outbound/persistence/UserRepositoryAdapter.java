@@ -78,6 +78,11 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
                     existingEntity.setMfaType(user.getMfaType());
                     existingEntity.setActive(user.getActive());
 
+                    // biometric fields
+                    existingEntity.setBiometricEnabled(user.getBiometricEnabled());
+                    existingEntity.setBiometricEnrolledAt(user.getBiometricEnrolledAt());
+                    existingEntity.setBiometricType(user.getBiometricType());
+
                     // persist() actualizará la entidad existente porque ya está managed
                     return userRepository.persist(existingEntity)
                             .onItem().transform(userEntityMapper::toDomain);

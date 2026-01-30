@@ -30,6 +30,7 @@ public class LoginResponse {
     public static class UserInfo {
         private Integer id;
         private String name;
+        private Boolean biometricEnabled;
         private KycInfo kyc;
     }
 

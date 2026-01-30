@@ -61,6 +61,7 @@ public class TokenService {
             userInfo = LoginResponse.UserInfo.builder()
                     .id(user.getId())
                     .name(fullName)
+                    .biometricEnabled(user.getBiometricEnabled())
                     .kyc(LoginResponse.KycInfo.builder()
                             .status(customer.getKycStatus())
                             .level(customer.getKycLevel())
