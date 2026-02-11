@@ -205,6 +205,13 @@
             <artifactId>pgvector</artifactId>
             <version>0.1.4</version>
         </dependency>
+        <!-- Firebase Cloud Messaging -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.4.3</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
