@@ -1,15 +1,11 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.repository;
 
 import io.quarkus.hibernate.reactive.panache.Panache;
-import io.quarkus.panache.common.Page;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.dto.query.JournalEntryFilter;
-import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryEntity;
-import org.walrex.infrastructure.adapter.outbound.persistence.entity.JournalEntryLineEntity;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -1,7 +1,6 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.repository;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepositoryBase;
-import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.CountryCurrencyEntity;

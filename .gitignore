@@ -49,3 +49,5 @@ nb-configuration.xml
 !README.md
 logs/
 uploads/
+
+firebase-service-account.json
