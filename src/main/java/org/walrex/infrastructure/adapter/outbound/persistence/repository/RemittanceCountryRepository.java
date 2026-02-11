@@ -1,38 +1,34 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.repository;
 
-import io.quarkus.hibernate.reactive.panache.PanacheRepositoryBase;
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.walrex.infrastructure.adapter.outbound.persistence.entity.RemittanceCountryEntity;
+import jakarta.inject.Inject;
+import org.hibernate.reactive.mutiny.Mutiny;
+import org.walrex.infrastructure.adapter.outbound.persistence.entity.CountryEntity;
 
 import java.util.List;
 
-/**
- * Repositorio reactivo para países habilitados en remesas
- */
 @ApplicationScoped
-public class RemittanceCountryRepository implements PanacheRepositoryBase<RemittanceCountryEntity, Integer> {
+public class RemittanceCountryRepository {
 
-    /**
-     * Obtiene todos los países activos para remesas con sus datos cargados
-     */
-    public Uni<List<RemittanceCountryEntity>> findAllActive() {
-        return find(
-                "SELECT rc FROM RemittanceCountryEntity rc " +
-                        "JOIN FETCH rc.country " +
-                        "WHERE rc.isActive = '1'"
-        ).list();
-    }
+    @Inject
+    Mutiny.SessionFactory sessionFactory;
 
-    /**
-     * Busca un país por su ID en la tabla country
-     */
-    public Uni<RemittanceCountryEntity> findByCountryId(Integer idCountry) {
-        return find(
-                "SELECT rc FROM RemittanceCountryEntity rc " +
-                        "JOIN FETCH rc.country c " +
-                        "WHERE c.id = ?1 AND rc.isActive = '1'",
-                idCountry
-        ).firstResult();
+    public Uni<List<CountryEntity>> findAllAvailableCountries() {
+        return Panache.withSession(() -> 
+            sessionFactory.withSession(session ->
+                session.createNativeQuery("""
+                    SELECT c.id, c.code_iso2, c.code_iso3, c.name_iso, c.unicode_flag, 
+                           c.code_phone_iso, c.status, c.created_at, c.updated_at, 
+                           c.deleted_at, c.numeric_code
+                    FROM remittance_countries rc
+                    INNER JOIN country c ON c.id = rc.id_country AND c.status = '1'
+                    WHERE rc.is_active = '1'
+                    ORDER BY c.name_iso ASC
+                    """, CountryEntity.class)
+                    .getResultList()
+            )
+        );
     }
 }
