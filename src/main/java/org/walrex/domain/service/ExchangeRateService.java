@@ -9,6 +9,7 @@ import org.walrex.application.port.output.ExchangeRateCachePort;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.application.port.output.PaymentMethodQueryPort;
 import org.walrex.application.port.output.PriceExchangeOutputPort;
+import org.walrex.application.port.output.PushNotificationPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeRate;
 import org.walrex.domain.model.ExchangeRateCache;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,6 +60,9 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
 
     @Inject
     ExchangeRateCachePort cachePort;
+
+    @Inject
+    PushNotificationPort pushNotificationPort;
 
     /**
      * Actualiza todas las tasas de cambio basado en las rutas de remesas configuradas
@@ -527,7 +532,24 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                                 currencyFrom, currencyTo, percentageChange, CHANGE_THRESHOLD_PERCENT);
                         return saveToRedisAndDb(cacheKey, currencyFrom, currencyTo,
                                 countryCurrencyFromId, countryCurrencyToId,
-                                currencyFromId, currencyToId, newRate, date);
+                                currencyFromId, currencyToId, newRate, date)
+                                .onItem().invoke(savedId -> {
+                                    // Fire-and-forget: enviar notificación FCM a todos los dispositivos activos
+                                    Map<String, String> fcmData = new HashMap<>();
+                                    fcmData.put("type", "EXCHANGE_RATE_UPDATE");
+                                    fcmData.put("title", "Tipo de cambio actualizado");
+                                    fcmData.put("body", currencyFrom + "/" + currencyTo + " ha variado un " + percentageChange.abs() + "%");
+                                    fcmData.put("screen", "exchange_rates");
+                                    fcmData.put("screenArgs", "{\"currencyFrom\":\"" + currencyFrom + "\",\"currencyTo\":\"" + currencyTo + "\"}");
+
+                                    pushNotificationPort.sendToAllActiveDevices(fcmData)
+                                            .subscribe().with(
+                                                    v -> log.info("=== [FCM] Push notification sent for {}/{} rate change ===",
+                                                            currencyFrom, currencyTo),
+                                                    err -> log.error("=== [FCM ERROR] Failed to send push notification: {} ===",
+                                                            err.getMessage())
+                                            );
+                                });
                     } else {
                         // Dentro del threshold → Solo actualizar TTL en Redis
                         log.info("=== [WITHIN THRESHOLD] {}/{} | Change {}% <= {}% | Updating TTL only ===",
