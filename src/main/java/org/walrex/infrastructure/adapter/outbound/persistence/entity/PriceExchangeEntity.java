@@ -2,10 +2,7 @@ package org.walrex.infrastructure.adapter.outbound.persistence.entity;
 
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,10 +15,11 @@ import java.time.OffsetTime;
  */
 @Entity
 @Table(name = "price_exchange")
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 public class PriceExchangeEntity extends PanacheEntityBase {
 
     @Id
@@ -52,6 +50,10 @@ public class PriceExchangeEntity extends PanacheEntityBase {
 
     @Column(name = "updated_at")
     private OffsetTime updatedAt;
+
+    // Nueva relación con fuente de tasa
+    @Column(name = "exchange_rate_source_id")
+    private Long exchangeRateSourceId;
 
     @PrePersist
     public void prePersist() {
