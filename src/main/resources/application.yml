@@ -87,6 +87,13 @@ quarkus:
   log:
     level: INFO
     min-level: TRACE
+    category:
+      "io.quarkus.security":
+        level: DEBUG
+      "io.smallrye.jwt":
+        level: DEBUG
+      "io.quarkus.smallrye.jwt":
+        level: DEBUG
   smallrye-fault-tolerance:
 
   langchain4j:
@@ -199,7 +206,11 @@ quarkus:
       distance: Cosine
       collection:
         name: accounting_data
-          
+
+
+    google:
+      cloud:
+        service-account-location: firebase-service-account.json
 azure:
   doc:
     intel:
@@ -243,7 +254,6 @@ mp:
       issuer: https://walrex.org/issuer
     secret: ${JWT_SECRET}
 
-smallrye:
-  jwt:
-    verify:
-      algorithm: HS256
+fcm:
+  enabled: true
+  credentials-file: firebase-service-account.json
