@@ -10,6 +10,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+import org.jose4j.keys.HmacKey;
+
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+import org.jose4j.keys.HmacKey;
+
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +50,9 @@ public class JwtSecurityInterceptor {
 
     @ConfigProperty(name = "mp.jwt.secret")
     String secret;
+
+    @ConfigProperty(name = "mp.jwt.verify.issuer")
+    String expectedIssuer;
 
     private static final String AUTH_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -69,6 +84,40 @@ public class JwtSecurityInterceptor {
         } catch (ParseException e) {
             log.warn("JWT validation failed: {}", e.getMessage());
             sendUnauthorized(rc, "Invalid or expired token");
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Autentica a partir del header Authorization (para JAX-RS resources).
+     * Usa Jose4j directamente para verificación HS256.
+     *
+     * @param authHeader valor del header Authorization
+     * @return Optional con el userId, o empty si la autenticación falló
+     */
+    public Optional<Integer> authenticateAndGetUserId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            log.warn("Missing or malformed Authorization header");
+            return Optional.empty();
+        }
+
+        String token = authHeader.substring(BEARER_PREFIX.length());
+
+        try {
+            HmacKey key = new HmacKey(secret.getBytes(StandardCharsets.UTF_8));
+            JwtConsumer jwtConsumer = new JwtConsumerBuilder()
+                    .setRequireExpirationTime()
+                    .setRequireSubject()
+                    .setExpectedIssuer(expectedIssuer)
+                    .setVerificationKey(key)
+                    .build();
+
+            JwtClaims claims = jwtConsumer.processToClaims(token);
+            Integer userId = Integer.valueOf(claims.getSubject());
+            log.debug("JWT validated successfully for userId: {}", userId);
+            return Optional.of(userId);
+        } catch (InvalidJwtException | org.jose4j.jwt.MalformedClaimException e) {
+            log.warn("JWT validation failed: {}", e.getMessage());
             return Optional.empty();
         }
     }
