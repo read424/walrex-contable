@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 @Builder
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 @ToString
 @EqualsAndHashCode
 public class Country {
@@ -18,6 +19,7 @@ public class Country {
     private String name;
     private String phoneCode;
     private String status;
+    private String unicodeFlag;
     private OffsetDateTime createdAt;
     private  OffsetDateTime updatedAt;
 }
