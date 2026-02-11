@@ -32,6 +32,8 @@ public class CurrencyEntity extends PanacheEntityBase {
 
         private String name;
 
+        private String symbol;
+
         private String status;
 
         @Column(name = "created_at")
