@@ -22,6 +22,14 @@ public class CountryRepository implements PanacheRepositoryBase<CountryEntity, I
     }
 
     /**
+     * Busca país por código ISO2 (activos solamente).
+     */
+    public Uni<CountryEntity> findByIso2Enabled(String codeIso2) {
+        return find("alphabeticCode2 = ?1 and status = '1'", codeIso2.toUpperCase())
+                .firstResult();
+    }
+
+    /**
      * Busca moneda por código alfabético (activas solamente).
      */
     public Uni<CountryEntity> findByAlphabeticCode(String code) {
