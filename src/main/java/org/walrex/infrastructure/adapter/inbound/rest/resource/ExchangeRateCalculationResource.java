@@ -89,7 +89,9 @@ public class ExchangeRateCalculationResource {
 
         return calculateExchangeRateUseCase.calculateExchangeRate(
                         request.amount(),
+                        request.baseCodeCountry(),
                         request.baseCurrency(),
+                        request.quoteCodeCountry(),
                         request.quoteCurrency(),
                         request.margin()
                 )
