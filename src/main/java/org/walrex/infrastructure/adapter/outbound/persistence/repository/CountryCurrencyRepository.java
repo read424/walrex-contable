@@ -66,12 +66,12 @@ public class CountryCurrencyRepository implements PanacheRepositoryBase<CountryC
     /**
      * Obtiene todas las monedas con sus datos completos (con joins).
      */
-    public Uni<List<CountryCurrencyEntity>> findByCountryIdWithCurrency(Integer countryId) {
+    public Uni<List<CountryCurrencyEntity>>findByCountryIdWithCurrency(Integer countryId) {
         return find("select cc from CountryCurrencyEntity cc " +
                         "join fetch cc.currency " +
                         "join fetch cc.country " +
                         "where cc.country.id = ?1 " +
-                        "order by cc.isPrimary desc, cc.currency.alphabeticCode asc", countryId)
+                        "order by cc.isPrimary ASC, cc.currency.alphabeticCode asc", countryId)
                 .list();
     }
 }
