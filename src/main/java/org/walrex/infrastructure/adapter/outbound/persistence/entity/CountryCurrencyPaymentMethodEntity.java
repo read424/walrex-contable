@@ -36,7 +36,7 @@ public class CountryCurrencyPaymentMethodEntity extends PanacheEntityBase {
     private BankEntity bank;
 
     @Builder.Default
-    @Column(name = "is_active", length = 1, nullable = false)
+    @Column(name = "is_active", columnDefinition="CHAR(1) DEFAULT '1' CHECK (is_active IN ('0', '1'))", nullable = false)
     private String isActive = "1";
 
     @Column(name = "created_at", nullable = false)
