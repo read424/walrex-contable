@@ -211,6 +211,12 @@
             <artifactId>firebase-admin</artifactId>
             <version>9.4.3</version>
         </dependency>
+        <!-- EMV QR Code -->
+        <dependency>
+            <groupId>com.github.mvallim</groupId>
+            <artifactId>emv-qrcode</artifactId>
+            <version>0.1.2</version>
+        </dependency>
 
         <!-- Lombok -->
         <dependency>
