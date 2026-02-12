@@ -35,7 +35,7 @@ public interface ExchangeRateMapper {
     @Mapping(target = "quoteCurrencyId", source = "idCurrencyQuote")
     @Mapping(target = "rate", source = "amountPrice")
     @Mapping(target = "exchangeDate", source = "dateExchange")
-    @Mapping(target = "exchangeRateSourceId", source = "exchangeRateSourceId")
+    @Mapping(target = "exchangeRateSourceId", ignore = true)
     @Mapping(target = "createdAt", expression = "java(entity.getCreatedAt() != null ? entity.getCreatedAt().atZoneSameInstant(java.time.ZoneOffset.UTC) : null)")
     @Mapping(target = "updatedAt", expression = "java(entity.getUpdatedAt() != null ? entity.getUpdatedAt().atDate(java.time.LocalDate.now()).atZoneSameInstant(java.time.ZoneOffset.UTC) : null)")
     @Mapping(target = "baseCurrency", ignore = true)
