@@ -1,6 +1,7 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.mapper;
 
 import org.mapstruct.*;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 import org.walrex.domain.model.RemittanceRoute;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.RemittanceRouteEntity;
 
@@ -25,6 +26,8 @@ public interface RemittanceRouteMapper {
      * @return RemittanceRoute modelo de dominio
      */
     @Mapping(source = "countryCurrencyFrom.id", target = "countryCurrencyFromId")
+    @Mapping(source = "countryCurrencyFrom.country.id", target = "countryFromId")
+    @Mapping(source = "countryCurrencyFrom.country.alphabeticCode2", target = "countryFromCode")
     @Mapping(source = "countryCurrencyFrom.currency.id", target = "currencyFromId")
     @Mapping(source = "countryCurrencyFrom.currency.alphabeticCode", target = "currencyFromCode")
     @Mapping(source = "countryCurrencyTo.id", target = "countryCurrencyToId")
@@ -40,4 +43,31 @@ public interface RemittanceRouteMapper {
      * @return Lista de RemittanceRoute
      */
     List<RemittanceRoute> toDomainList(List<RemittanceRouteEntity> entities);
+
+    /**
+     * Convierte RemittanceRouteEntity a ExchangeRateRouteInfo (incluye datos del país destino)
+     *
+     * @param entity La entidad de persistencia
+     * @return ExchangeRateRouteInfo modelo de dominio con info del país destino
+     */
+    @Mapping(source = "countryCurrencyFrom.id", target = "countryCurrencyFromId")
+    @Mapping(source = "countryCurrencyFrom.country.id", target = "countryFromId")
+    @Mapping(source = "countryCurrencyFrom.country.alphabeticCode2", target = "countryFromCode")
+    @Mapping(source = "countryCurrencyFrom.currency.id", target = "currencyFromId")
+    @Mapping(source = "countryCurrencyFrom.currency.alphabeticCode", target = "currencyFromCode")
+    @Mapping(source = "countryCurrencyTo.id", target = "countryCurrencyToId")
+    @Mapping(source = "countryCurrencyTo.currency.id", target = "currencyToId")
+    @Mapping(source = "countryCurrencyTo.currency.alphabeticCode", target = "currencyToCode")
+    @Mapping(source = "countryCurrencyTo.country.id", target = "countryToId")
+    @Mapping(source = "countryCurrencyTo.country.alphabeticCode2", target = "countryToCode")
+    @Mapping(source = "intermediaryAsset", target = "intermediaryAsset")
+    ExchangeRateRouteInfo toExchangeRateRouteInfo(RemittanceRouteEntity entity);
+
+    /**
+     * Convierte una lista de entidades a lista de ExchangeRateRouteInfo
+     *
+     * @param entities Lista de entidades
+     * @return Lista de ExchangeRateRouteInfo
+     */
+    List<ExchangeRateRouteInfo> toExchangeRateRouteInfoList(List<RemittanceRouteEntity> entities);
 }
