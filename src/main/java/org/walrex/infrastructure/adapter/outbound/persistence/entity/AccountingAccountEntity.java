@@ -69,7 +69,7 @@ public class AccountingAccountEntity extends PanacheEntityBase {
      * Se almacena como string en la DB usando el enum PostgreSQL normal_side.
      * La conversión es manejada por {@link NormalSideConverter}.
      */
-    @Column(name = "normal_side", nullable = false)
+    @Column(name = "normal_side", nullable = false, columnDefinition = "TEXT")
     private NormalSide normalSide;
 
     /**
