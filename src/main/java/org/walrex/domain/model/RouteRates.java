@@ -12,6 +12,8 @@ public record RouteRates(
         String currencyToCode,         // Código moneda destino (ej: VEN)
         Long countryCurrencyFromId,    // ID country_currency origen
         Long countryCurrencyToId,      // ID country_currency destino
+        String countryFromCode,        // Código ISO2 país origen (ej: PE, EC)
+        String countryToCode,          // Código ISO2 país destino (ej: VE)
         List<ExchangeRate> buyRates,   // Tasas para comprar USDT con moneda origen
         List<ExchangeRate> sellRates   // Tasas para vender USDT por moneda destino
 ) {
