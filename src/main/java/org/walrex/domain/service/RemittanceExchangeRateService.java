@@ -26,6 +26,7 @@ import org.walrex.infrastructure.adapter.outbound.persistence.mapper.ExchangeRat
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.RemittanceCountryRepository;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -113,19 +114,28 @@ public class RemittanceExchangeRateService implements GetRemittanceCountriesUseC
                 .flagEmoji(firstRow.getCountryFlag())
                 .build();
             
-            // Monedas del país destino (sin agrupar, respetando duplicados)
+            // Monedas del país destino (deduplicadas por código ISO)
             List<CurrencyInfoResponse> destCurrencies = countryRows.stream()
-                .filter(dto -> dto.getCodeIsoTo() != null) // Filtrar filas con datos de moneda destino
-                .map(dto -> CurrencyInfoResponse.builder()
-                    .code(dto.getCodeIsoTo())
-                    .name(dto.getNameIsoTo())
-                    .symbol(dto.getSymbolIsoTo())
-                    .build())
-                .collect(Collectors.toList());
-            
+                .filter(dto -> dto.getCodeIsoTo() != null)
+                .collect(Collectors.toMap(
+                    RemittanceRouteResultDto::getCodeIsoTo,
+                    dto -> CurrencyInfoResponse.builder()
+                        .code(dto.getCodeIsoTo())
+                        .name(dto.getNameIsoTo())
+                        .symbol(dto.getSymbolIsoTo())
+                        .build(),
+                    (existing, duplicate) -> existing,
+                    LinkedHashMap::new
+                ))
+                .values().stream().collect(Collectors.toList());
+
+            // Cantidad de exchange_rate_types activos para el país destino
+            Integer rateTypesCount = firstRow.getRateTypesCount() != null ? firstRow.getRateTypesCount() : 0;
+
             destinations.add(DestinationCountryResponse.builder()
                 .country(destCountryResponse)
                 .currencies(destCurrencies)
+                .rateTypesCount(rateTypesCount)
                 .build());
         }
         
