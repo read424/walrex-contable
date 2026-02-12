@@ -16,19 +16,21 @@ public class RemittanceExchangeCountryRepository {
     Mutiny.SessionFactory sessionFactory;
 
     public Uni<List<RemittanceRouteResultDto>> findDestinationCountriesWithCurrencies(Integer countryId) {
-        return Panache.withSession(() -> 
+        return Panache.withSession(() ->
             sessionFactory.withSession(session ->
                 session.createNativeQuery("""
-                    SELECT c.code_iso3 AS codeIsoFrom, 
-                           c.name AS nameIsoFrom, 
-                           c.symbol AS symbolIsoFrom, 
-                           c2.code_iso3 AS codeIsoTo, 
-                           c2.name AS nameIsoTo, 
-                           c2.symbol AS symbolIsoTo, 
-                           c3.code_iso2 AS countryIso2, 
-                           c3.code_iso3 AS countryIso3, 
-                           c3.name_iso AS countryName, 
-                           c3.unicode_flag AS countryFlag
+                    SELECT c.code_iso3 AS codeIsoFrom,
+                           c.name AS nameIsoFrom,
+                           c.symbol AS symbolIsoFrom,
+                           c2.code_iso3 AS codeIsoTo,
+                           c2.name AS nameIsoTo,
+                           c2.symbol AS symbolIsoTo,
+                           c3.code_iso2 AS countryIso2,
+                           c3.code_iso3 AS countryIso3,
+                           c3.name_iso AS countryName,
+                           c3.unicode_flag AS countryFlag,
+                           (SELECT COUNT(*) FROM exchange_rate_types ert
+                            WHERE ert.country_id = c3.id AND ert.is_active = '1')::int AS rateTypesCount
                     FROM remittance_countries rc
                     LEFT OUTER JOIN remittance_routes rr ON rr.id_remittance_country = rc.id
                     LEFT OUTER JOIN country_currencies cc ON cc.id = rr.id_country_currencies_from
@@ -47,16 +49,17 @@ public class RemittanceExchangeCountryRepository {
             for (Object result : results) {
                 Object[] row = (Object[]) result;
                 dtoList.add(new RemittanceRouteResultDto(
-                    (String) row[0], // codeIsoFrom
-                    (String) row[1], // nameIsoFrom
-                    (String) row[2], // symbolIsoFrom
-                    (String) row[3], // codeIsoTo
-                    (String) row[4], // nameIsoTo
-                    (String) row[5], // symbolIsoTo
-                    (String) row[6], // countryIso2
-                    (String) row[7], // countryIso3
-                    (String) row[8], // countryName
-                    (String) row[9]  // countryFlag
+                    (String) row[0],  // codeIsoFrom
+                    (String) row[1],  // nameIsoFrom
+                    (String) row[2],  // symbolIsoFrom
+                    (String) row[3],  // codeIsoTo
+                    (String) row[4],  // nameIsoTo
+                    (String) row[5],  // symbolIsoTo
+                    (String) row[6],  // countryIso2
+                    (String) row[7],  // countryIso3
+                    (String) row[8],  // countryName
+                    (String) row[9],  // countryFlag
+                    (Integer) row[10] // rateTypesCount
                 ));
             }
             return dtoList;
