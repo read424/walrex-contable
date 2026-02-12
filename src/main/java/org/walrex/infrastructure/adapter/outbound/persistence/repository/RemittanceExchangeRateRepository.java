@@ -110,7 +110,6 @@ public class RemittanceExchangeRateRepository implements PanacheRepository<Price
                     .typeOperation("3") // REMESAS
                     .idCurrencyBase(baseCurrencyId)
                     .idCurrencyQuote(quoteCurrencyId)
-                    .exchangeRateSourceId(exchangeRateSourceId)
                     .amountPrice(rate)
                     .dateExchange(today)
                     .isActive("1")

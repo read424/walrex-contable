@@ -10,6 +10,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.walrex.application.port.output.ExchangeRateProviderPort;
 import org.walrex.domain.model.ExchangeRate;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 import org.walrex.domain.model.ExchangeRateUpdate;
 import org.walrex.domain.model.RemittanceRoute;
 import org.walrex.domain.model.RouteRates;
@@ -43,6 +44,9 @@ class ExchangeRateServiceTest {
     @Mock
     org.walrex.application.port.output.ExchangeRateCachePort cachePort;
 
+    @Mock
+    org.walrex.application.port.output.PushNotificationPort pushNotificationPort;
+
     @InjectMocks
     ExchangeRateService exchangeRateService;
 
@@ -61,33 +65,45 @@ class ExchangeRateServiceTest {
                 .thenReturn(Uni.createFrom().item(java.util.Optional.empty()));
         Mockito.lenient().when(cachePort.set(anyString(), any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
+
+        // Setup para push notifications (fire-and-forget)
+        Mockito.lenient().when(pushNotificationPort.sendToAllActiveDevices(any()))
+                .thenReturn(Uni.createFrom().voidItem());
     }
 
     @Test
     void shouldFetchExchangeRatesSuccessfully() {
-        // Arrange - Configurar rutas de remesas
-        List<RemittanceRoute> routes = List.of(
-                RemittanceRoute.builder()
+        // Arrange - Configurar rutas de remesas con ExchangeRateRouteInfo
+        List<ExchangeRateRouteInfo> routes = List.of(
+                ExchangeRateRouteInfo.builder()
                         .countryCurrencyFromId(1L)
+                        .countryFromId(1)
+                        .countryFromCode("PE")
                         .currencyFromId(1)
                         .currencyFromCode("PEN")
                         .countryCurrencyToId(2L)
                         .currencyToId(2)
                         .currencyToCode("VES")
+                        .countryToId(3)
+                        .countryToCode("VE")
                         .intermediaryAsset("USDT")
                         .build(),
-                RemittanceRoute.builder()
+                ExchangeRateRouteInfo.builder()
                         .countryCurrencyFromId(2L)
+                        .countryFromId(2)
+                        .countryFromCode("VE")
                         .currencyFromId(2)
                         .currencyFromCode("VES")
                         .countryCurrencyToId(1L)
                         .currencyToId(1)
                         .currencyToCode("PEN")
+                        .countryToId(1)
+                        .countryToCode("PE")
                         .intermediaryAsset("USDT")
                         .build()
         );
 
-        Mockito.when(remittanceRoutePort.findAllActiveRoutes())
+        Mockito.when(remittanceRoutePort.findAllActiveExchangeRateRoutes())
                 .thenReturn(Uni.createFrom().item(routes));
 
         // Mock tasas para PEN
@@ -123,15 +139,15 @@ class ExchangeRateServiceTest {
         assertNotNull(result);
         assertEquals(2, result.ratesByPair().size()); // Dos pares
 
-        // Verificar tasas de PEN->VES
-        RouteRates penVesRates = result.ratesByPair().get("PEN/USDT/VES");
-        assertNotNull(penVesRates, "Should have PEN/USDT/VES pair");
+        // Verificar tasas de PE:PEN->VES (agrupación incluye país)
+        RouteRates penVesRates = result.ratesByPair().get("PE:PEN/USDT/VES");
+        assertNotNull(penVesRates, "Should have PE:PEN/USDT/VES pair");
         assertEquals(2, penVesRates.buyRates().size());
         assertEquals(0, penVesRates.sellRates().size());
 
-        // Verificar tasas de VES->PEN
-        RouteRates vesPenRates = result.ratesByPair().get("VES/USDT/PEN");
-        assertNotNull(vesPenRates, "Should have VES/USDT/PEN pair");
+        // Verificar tasas de VE:VES->PEN
+        RouteRates vesPenRates = result.ratesByPair().get("VE:VES/USDT/PEN");
+        assertNotNull(vesPenRates, "Should have VE:VES/USDT/PEN pair");
         assertEquals(1, vesPenRates.buyRates().size());
         assertEquals(0, vesPenRates.sellRates().size());
 
@@ -144,20 +160,24 @@ class ExchangeRateServiceTest {
 
     @Test
     void shouldHandleProviderFailureGracefully() {
-        // Arrange - Configurar rutas de remesas
-        List<RemittanceRoute> routes = List.of(
-                RemittanceRoute.builder()
+        // Arrange - Configurar rutas de remesas con ExchangeRateRouteInfo
+        List<ExchangeRateRouteInfo> routes = List.of(
+                ExchangeRateRouteInfo.builder()
                         .countryCurrencyFromId(1L)
+                        .countryFromId(1)
+                        .countryFromCode("PE")
                         .currencyFromId(1)
                         .currencyFromCode("PEN")
                         .countryCurrencyToId(2L)
                         .currencyToId(2)
                         .currencyToCode("VES")
+                        .countryToId(3)
+                        .countryToCode("VE")
                         .intermediaryAsset("USDT")
                         .build()
         );
 
-        Mockito.when(remittanceRoutePort.findAllActiveRoutes())
+        Mockito.when(remittanceRoutePort.findAllActiveExchangeRateRoutes())
                 .thenReturn(Uni.createFrom().item(routes));
 
         // Simular que el proveedor falla y se recupera devolviendo lista vacía
@@ -186,7 +206,7 @@ class ExchangeRateServiceTest {
     @Test
     void shouldHandleNoRoutesConfigured() {
         // Arrange - No hay rutas configuradas
-        Mockito.when(remittanceRoutePort.findAllActiveRoutes())
+        Mockito.when(remittanceRoutePort.findAllActiveExchangeRateRoutes())
                 .thenReturn(Uni.createFrom().item(Collections.emptyList()));
 
         // Act

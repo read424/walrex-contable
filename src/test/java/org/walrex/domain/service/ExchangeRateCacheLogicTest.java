@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
  *
  * Verifica:
  * - Cálculo de diferencia porcentual
- * - Verificación de threshold ±0.5%
+ * - Verificación de threshold ±0.8%
  * - Integración con Redis caché
  */
 @ExtendWith(MockitoExtension.class)
@@ -88,50 +88,50 @@ class ExchangeRateCacheLogicTest {
 
     @Test
     void shouldDetectChangeWithinThreshold() {
-        // Given - Cambio de 0.2% (dentro de ±0.5%)
+        // Given - Cambio de 0.2% (dentro de ±0.8%)
         BigDecimal percentageChange = BigDecimal.valueOf(0.2);
 
         // When
         boolean exceeds = invokeExceedsThreshold(percentageChange);
 
         // Then
-        assertFalse(exceeds, "0.2% should be within ±0.5% threshold");
+        assertFalse(exceeds, "0.2% should be within ±0.8% threshold");
     }
 
     @Test
     void shouldDetectChangeExceedingThreshold() {
-        // Given - Cambio de 0.6% (fuera de ±0.5%)
-        BigDecimal percentageChange = BigDecimal.valueOf(0.6);
+        // Given - Cambio de 0.9% (fuera de ±0.8%)
+        BigDecimal percentageChange = BigDecimal.valueOf(0.9);
 
         // When
         boolean exceeds = invokeExceedsThreshold(percentageChange);
 
         // Then
-        assertTrue(exceeds, "0.6% should exceed ±0.5% threshold");
+        assertTrue(exceeds, "0.9% should exceed ±0.8% threshold");
     }
 
     @Test
     void shouldDetectNegativeChangeExceedingThreshold() {
-        // Given - Cambio de -0.8% (fuera de ±0.5%)
-        BigDecimal percentageChange = BigDecimal.valueOf(-0.8);
+        // Given - Cambio de -0.9% (fuera de ±0.8%)
+        BigDecimal percentageChange = BigDecimal.valueOf(-0.9);
 
         // When
         boolean exceeds = invokeExceedsThreshold(percentageChange);
 
         // Then
-        assertTrue(exceeds, "-0.8% should exceed ±0.5% threshold");
+        assertTrue(exceeds, "-0.9% should exceed ±0.8% threshold");
     }
 
     @Test
     void shouldDetectChangeExactlyAtThreshold() {
-        // Given - Cambio exactamente en el límite (0.5%)
-        BigDecimal percentageChange = BigDecimal.valueOf(0.5);
+        // Given - Cambio exactamente en el límite (0.8%)
+        BigDecimal percentageChange = BigDecimal.valueOf(0.8);
 
         // When
         boolean exceeds = invokeExceedsThreshold(percentageChange);
 
         // Then
-        assertFalse(exceeds, "0.5% should be within threshold (not exceeding)");
+        assertFalse(exceeds, "0.8% should be within threshold (not exceeding)");
     }
 
     @Test

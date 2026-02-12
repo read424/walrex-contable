@@ -6,6 +6,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 import org.walrex.domain.model.RemittanceRoute;
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.RemittanceRouteMapper;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.RemittanceRouteRepository;
@@ -43,6 +44,27 @@ public class RemittanceRoutePersistenceAdapter implements RemittanceRouteOutputP
                     List<RemittanceRoute> routes = remittanceRouteMapper.toDomainList(entities);
 
                     log.info("Mapped {} remittance routes", routes.size());
+                    return routes;
+                });
+    }
+
+    @Override
+    @WithSession
+    public Uni<List<ExchangeRateRouteInfo>> findAllActiveExchangeRateRoutes() {
+        log.info("Fetching all active exchange rate routes");
+
+        return remittanceRouteRepository.findAllActiveExchangeRateRoutes()
+                .onItem().transform(entities -> {
+                    if (entities.isEmpty()) {
+                        log.info("No active exchange rate routes found");
+                        return new ArrayList<ExchangeRateRouteInfo>();
+                    }
+
+                    log.info("Found {} active exchange rate route entities", entities.size());
+
+                    List<ExchangeRateRouteInfo> routes = remittanceRouteMapper.toExchangeRateRouteInfoList(entities);
+
+                    log.info("Mapped {} exchange rate routes", routes.size());
                     return routes;
                 });
     }

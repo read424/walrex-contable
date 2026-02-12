@@ -13,6 +13,7 @@ import org.walrex.application.port.output.PushNotificationPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeRate;
 import org.walrex.domain.model.ExchangeRateCache;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 import org.walrex.domain.model.RemittanceRoute;
 import org.walrex.domain.model.ExchangeRateUpdate;
 import org.walrex.domain.model.RouteRates;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Servicio de dominio para gestionar tasas de cambio entre Perú y Venezuela
@@ -43,7 +45,7 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class ExchangeRateService implements UpdateExchangeRatesUseCase {
 
-    private static final BigDecimal CHANGE_THRESHOLD_PERCENT = BigDecimal.valueOf(0.5); // ±0.5%
+    private static final BigDecimal CHANGE_THRESHOLD_PERCENT = BigDecimal.valueOf(0.8); // ±0.5%
     private static final Duration CACHE_TTL = Duration.ofHours(12); // 12 horas
 
     @Inject
@@ -73,7 +75,7 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
     public Uni<ExchangeRateUpdate> updateExchangeRates() {
         log.info("Starting exchange rate update for remittances");
 
-        return remittanceRoutePort.findAllActiveRoutes()
+        return remittanceRoutePort.findAllActiveExchangeRateRoutes()
                 .onFailure().invoke(error ->
                         log.error("=== [ERROR] Failed to fetch active routes ===", error)
                 )
@@ -88,11 +90,12 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
 
                     log.info("Found {} active remittance routes", routes.size());
 
-                    // Agrupar por par de monedas completo (currencyFrom/intermediaryAsset/currencyTo)
-                    // Ejemplo: PEN/USDT/VES, USD/USDT/VES
-                    Map<String, RemittanceRoute> uniquePairs = routes.stream()
+                    // Agrupar por país + par de monedas (countryFrom:currencyFrom/intermediaryAsset/currencyTo)
+                    // Ejemplo: EC:USD/USDT/VES, PE:PEN/USDT/VES, PE:USD/USDT/VES, US:USD/USDT/VES
+                    Map<String, ExchangeRateRouteInfo> uniquePairs = routes.stream()
                             .collect(Collectors.toMap(
-                                    route -> route.getCurrencyFromCode() + "/" +
+                                    route -> route.getCountryFromCode() + ":" +
+                                            route.getCurrencyFromCode() + "/" +
                                             route.getIntermediaryAsset() + "/" +
                                             route.getCurrencyToCode(),
                                     route -> route,
@@ -100,6 +103,11 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                             ));
 
                     log.info("Processing {} unique currency pairs", uniquePairs.size());
+                    uniquePairs.forEach((key, route) ->
+                            log.info("=== [PAIR] {} | ccFromId:{} ccToId:{} | currFromId:{} currToId:{} ===",
+                                    key, route.getCountryCurrencyFromId(), route.getCountryCurrencyToId(),
+                                    route.getCurrencyFromId(), route.getCurrencyToId())
+                    );
 
                     // Para cada par único, consultar BUY y SELL
                     List<Uni<Map.Entry<String, RouteRates>>> rateUnis = uniquePairs.entrySet().stream()
@@ -140,7 +148,7 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
      */
     private Uni<Map.Entry<String, RouteRates>> fetchRatesForPair(
             String pairKey,
-            RemittanceRoute route) {
+            ExchangeRateRouteInfo route) {
 
         Long countryCurrencyFromId = route.getCountryCurrencyFromId();
         Integer currencyFromId = route.getCurrencyFromId();
@@ -193,6 +201,8 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                             currencyTo,
                             countryCurrencyFromId,
                             countryCurrencyToId,
+                            route.getCountryFromCode(),
+                            route.getCountryToCode(),
                             tuple.getItem1(),
                             tuple.getItem2()
                     );
@@ -383,8 +393,10 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
         // Crear lista de operaciones de guardado para cada par
         List<Uni<Integer>> saveOperations = update.ratesByPair().values().stream()
                 .flatMap(rates -> {
-                    Integer currencyFromId = rates.currencyFromId();  // ID moneda origen (PEN)
-                    Integer currencyToId = rates.currencyToId();      // ID moneda destino (VES)
+                    String countryFromCode = rates.countryFromCode();
+                    String countryToCode = rates.countryToCode();
+                    Integer ccFromId = rates.countryCurrencyFromId().intValue();  // ID country_currencies origen
+                    Integer ccToId = rates.countryCurrencyToId().intValue();      // ID country_currencies destino
                     String currencyFrom = rates.currencyFromCode();   // PEN
                     String currencyTo = rates.currencyToCode();       // VES
 
@@ -402,7 +414,7 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                     if (avgBuy.compareTo(BigDecimal.ZERO) <= 0 || avgSell.compareTo(BigDecimal.ZERO) <= 0) {
                         log.warn("=== [SKIP] Skipping {}->{} due to zero or missing rates (buy: {}, sell: {}) ===",
                                 currencyFrom, currencyTo, avgBuy, avgSell);
-                        return java.util.stream.Stream.empty(); // Saltar este par
+                        return Stream.empty(); // Saltar este par
                     }
 
                     // Calcular tasa cruzada: cuántos VES por cada PEN
@@ -412,16 +424,20 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                     // Aplicar margen de ganancia del 5%
                     // DIVIDIR (no multiplicar) para dar MENOS al cliente y ganar el 5%
                     // Ejemplo: si crossRate = 14.3, marginRate = 14.3 / 1.05 = 13.62 (cliente recibe menos, nosotros ganamos)
-                    BigDecimal marginRate = crossRate.divide(BigDecimal.valueOf(1.05), 5, RoundingMode.HALF_UP);
+                    BigDecimal marginRate = crossRate.divide(BigDecimal.valueOf(1.065), 5, RoundingMode.HALF_UP);
 
                     log.info("=== [CROSS RATE] {}->{} | Without margin: {} | With 5% margin: {} ===",
                             currencyFrom, currencyTo, crossRate, marginRate);
 
                     // Verificar caché y decidir si guardar en BD
-                    return java.util.stream.Stream.of(saveRateWithCache(
-                            currencyFromId,
+                    // Se pasan ccFromId/ccToId (country_currencies IDs) para que cada país
+                    // tenga su propio registro en price_exchange
+                    return Stream.of(saveRateWithCache(
+                            countryFromCode,
+                            countryToCode,
+                            ccFromId,
                             currencyFrom,
-                            currencyToId,
+                            ccToId,
                             currencyTo,
                             rates.countryCurrencyFromId(),
                             rates.countryCurrencyToId(),
@@ -494,6 +510,8 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
      *    - Si excede ±0.5% → Guardar en Redis + BD
      */
     private Uni<Integer> saveRateWithCache(
+            String countryFromCode,
+            String countryToCode,
             Integer currencyFromId,
             String currencyFrom,
             Integer currencyToId,
@@ -504,9 +522,9 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
             LocalDate date) {
 
         String cacheKey = ExchangeRateCache.generateCacheKey(
-                currencyFrom, currencyTo, countryCurrencyFromId, countryCurrencyToId);
+                countryFromCode, currencyFrom, countryToCode, currencyTo, date);
 
-        log.debug("=== [CACHE CHECK] Key: {} | NewRate: {} ===", cacheKey, newRate);
+        log.info("=== [CACHE CHECK] Key: {} | NewRate: {} ===", cacheKey, newRate);
 
         return cachePort.get(cacheKey)
                 .flatMap(cachedOptional -> {
@@ -514,9 +532,31 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                         // No existe en caché → Guardar en Redis + BD
                         log.info("=== [CACHE MISS] {}/{} | Saving to Redis + DB ===",
                                 currencyFrom, currencyTo);
-                        return saveToRedisAndDb(cacheKey, currencyFrom, currencyTo,
+                        return saveToRedisAndDb(cacheKey, countryFromCode, countryToCode,
+                                currencyFrom, currencyTo,
                                 countryCurrencyFromId, countryCurrencyToId,
-                                currencyFromId, currencyToId, newRate, date);
+                                currencyFromId, currencyToId, newRate, date)
+                                .onItem().invoke(savedId -> {
+                                    try {
+                                        Map<String, String> fcmData = new HashMap<>();
+                                        fcmData.put("type", "EXCHANGE_RATE_NEW");
+                                        fcmData.put("title", "Nueva tasa disponible");
+                                        fcmData.put("body", "Tasa " + currencyFrom + "/" + currencyTo + " disponible para hoy");
+                                        fcmData.put("screen", "exchange_rates");
+                                        fcmData.put("screenArgs", "{\"currencyFrom\":\"" + currencyFrom + "\",\"currencyTo\":\"" + currencyTo + "\"}");
+
+                                        pushNotificationPort.sendToAllActiveDevices(fcmData)
+                                                .subscribe().with(
+                                                        v -> log.info("=== [FCM] Push notification sent for new {}/{} rate ===",
+                                                                currencyFrom, currencyTo),
+                                                        err -> log.error("=== [FCM ERROR] Failed to send push notification: {} ===",
+                                                                err.getMessage())
+                                                );
+                                    } catch (Exception e) {
+                                        log.error("=== [FCM ERROR] Exception sending push for new {}/{} rate: {} ===",
+                                                currencyFrom, currencyTo, e.getMessage());
+                                    }
+                                });
                     }
 
                     ExchangeRateCache cached = cachedOptional.get();
@@ -530,32 +570,37 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                         // Excede threshold → Guardar en Redis + BD
                         log.info("=== [THRESHOLD EXCEEDED] {}/{} | Change {}% > {}% | Saving to Redis + DB ===",
                                 currencyFrom, currencyTo, percentageChange, CHANGE_THRESHOLD_PERCENT);
-                        return saveToRedisAndDb(cacheKey, currencyFrom, currencyTo,
+                        return saveToRedisAndDb(cacheKey, countryFromCode, countryToCode,
+                                currencyFrom, currencyTo,
                                 countryCurrencyFromId, countryCurrencyToId,
                                 currencyFromId, currencyToId, newRate, date)
                                 .onItem().invoke(savedId -> {
-                                    // Fire-and-forget: enviar notificación FCM a todos los dispositivos activos
-                                    Map<String, String> fcmData = new HashMap<>();
-                                    fcmData.put("type", "EXCHANGE_RATE_UPDATE");
-                                    fcmData.put("title", "Tipo de cambio actualizado");
-                                    fcmData.put("body", currencyFrom + "/" + currencyTo + " ha variado un " + percentageChange.abs() + "%");
-                                    fcmData.put("screen", "exchange_rates");
-                                    fcmData.put("screenArgs", "{\"currencyFrom\":\"" + currencyFrom + "\",\"currencyTo\":\"" + currencyTo + "\"}");
+                                    try {
+                                        Map<String, String> fcmData = new HashMap<>();
+                                        fcmData.put("type", "EXCHANGE_RATE_UPDATE");
+                                        fcmData.put("title", "Tipo de cambio actualizado");
+                                        fcmData.put("body", currencyFrom + "/" + currencyTo + " ha variado un " + percentageChange.abs() + "%");
+                                        fcmData.put("screen", "exchange_rates");
+                                        fcmData.put("screenArgs", "{\"currencyFrom\":\"" + currencyFrom + "\",\"currencyTo\":\"" + currencyTo + "\"}");
 
-                                    pushNotificationPort.sendToAllActiveDevices(fcmData)
-                                            .subscribe().with(
-                                                    v -> log.info("=== [FCM] Push notification sent for {}/{} rate change ===",
-                                                            currencyFrom, currencyTo),
-                                                    err -> log.error("=== [FCM ERROR] Failed to send push notification: {} ===",
-                                                            err.getMessage())
-                                            );
+                                        pushNotificationPort.sendToAllActiveDevices(fcmData)
+                                                .subscribe().with(
+                                                        v -> log.info("=== [FCM] Push notification sent for {}/{} rate change ===",
+                                                                currencyFrom, currencyTo),
+                                                        err -> log.error("=== [FCM ERROR] Failed to send push notification: {} ===",
+                                                                err.getMessage())
+                                                );
+                                    } catch (Exception e) {
+                                        log.error("=== [FCM ERROR] Exception sending push for {}/{} rate change: {} ===",
+                                                currencyFrom, currencyTo, e.getMessage());
+                                    }
                                 });
                     } else {
                         // Dentro del threshold → Solo actualizar TTL en Redis
                         log.info("=== [WITHIN THRESHOLD] {}/{} | Change {}% <= {}% | Updating TTL only ===",
                                 currencyFrom, currencyTo, percentageChange, CHANGE_THRESHOLD_PERCENT);
-                        return updateCacheTTL(cacheKey, currencyFrom, currencyTo,
-                                countryCurrencyFromId, countryCurrencyToId, newRate);
+                        return updateCacheTTL(cacheKey, countryFromCode, countryToCode,
+                                currencyFrom, currencyTo, newRate);
                     }
                 })
                 .onFailure().invoke(error ->
@@ -571,10 +616,14 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
     }
 
     /**
-     * Guarda la tasa en Redis y en la base de datos.
+     * Guarda la tasa en la base de datos y luego en Redis.
+     * IMPORTANTE: Se ejecuta SECUENCIALMENTE (BD primero, Redis después) para evitar
+     * problemas de contexto de transacción Hibernate al correr en paralelo con Redis.
      */
     private Uni<Integer> saveToRedisAndDb(
             String cacheKey,
+            String countryFromCode,
+            String countryToCode,
             String currencyFrom,
             String currencyTo,
             Long countryCurrencyFromId,
@@ -584,30 +633,29 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
             BigDecimal rate,
             LocalDate date) {
 
-        ExchangeRateCache cacheValue = ExchangeRateCache.builder()
-                .rate(rate)
-                .currencyFrom(currencyFrom)
-                .currencyTo(currencyTo)
-                .countryCurrencyFromId(countryCurrencyFromId)
-                .countryCurrencyToId(countryCurrencyToId)
-                .updatedAt(OffsetDateTime.now())
-                .build();
+        // Paso 1: Guardar en BD primero (requiere @WithTransaction limpio)
+        return saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo,
+                rate, date, "CROSS_RATE")
+                .onItem().transformToUni(savedId -> {
+                    // Paso 2: BD exitosa → actualizar Redis cache
+                    log.info("=== [DB OK] {}/{} savedId:{} | Now saving to Redis cache key: {} ===",
+                            currencyFrom, currencyTo, savedId, cacheKey);
 
-        // Guardar en Redis primero (con manejo de errores silencioso)
-        Uni<Void> cacheUpdate = cachePort.set(cacheKey, cacheValue, CACHE_TTL)
-                .onFailure().invoke(error ->
-                        log.error("Failed to save to Redis cache: {}", error.getMessage())
-                )
-                .onFailure().recoverWithNull();
+                    ExchangeRateCache cacheValue = ExchangeRateCache.builder()
+                            .rate(rate)
+                            .currencyFrom(currencyFrom)
+                            .currencyTo(currencyTo)
+                            .countryFromCode(countryFromCode)
+                            .countryToCode(countryToCode)
+                            .updatedAt(OffsetDateTime.now())
+                            .build();
 
-        // Guardar en BD
-        Uni<Integer> dbSave = saveRate(currencyFromId, currencyFrom, currencyToId, currencyTo,
-                rate, date, "CROSS_RATE");
-
-        // Ejecutar ambos, pero retornar el resultado del DB
-        return Uni.combine().all().unis(cacheUpdate, dbSave)
-                .asTuple()
-                .map(tuple -> tuple.getItem2());
+                    return cachePort.set(cacheKey, cacheValue, CACHE_TTL)
+                            .onFailure().invoke(error ->
+                                    log.error("Failed to save to Redis cache: {}", error.getMessage()))
+                            .onFailure().recoverWithNull()
+                            .replaceWith(savedId);
+                });
     }
 
     /**
@@ -615,18 +663,18 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
      */
     private Uni<Integer> updateCacheTTL(
             String cacheKey,
+            String countryFromCode,
+            String countryToCode,
             String currencyFrom,
             String currencyTo,
-            Long countryCurrencyFromId,
-            Long countryCurrencyToId,
             BigDecimal rate) {
 
         ExchangeRateCache cacheValue = ExchangeRateCache.builder()
                 .rate(rate)
                 .currencyFrom(currencyFrom)
                 .currencyTo(currencyTo)
-                .countryCurrencyFromId(countryCurrencyFromId)
-                .countryCurrencyToId(countryCurrencyToId)
+                .countryFromCode(countryFromCode)
+                .countryToCode(countryToCode)
                 .updatedAt(OffsetDateTime.now())
                 .build();
 

@@ -24,6 +24,7 @@ public class User {
     private String pinHash;
 
     private Boolean biometricEnabled;
+    private Boolean deviceTrusted;
 
     private String biometricType;
 

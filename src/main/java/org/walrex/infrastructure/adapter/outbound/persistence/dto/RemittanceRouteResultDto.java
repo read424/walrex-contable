@@ -18,11 +18,13 @@ public class RemittanceRouteResultDto {
     private String countryIso3;
     private String countryName;
     private String countryFlag;
-    
+    private Integer rateTypesCount;
+
     // Constructor para usar con createNativeQuery
     public RemittanceRouteResultDto(String codeIsoFrom, String nameIsoFrom, String symbolIsoFrom,
                                    String codeIsoTo, String nameIsoTo, String symbolIsoTo,
-                                   String countryIso2, String countryIso3, String countryName, String countryFlag) {
+                                   String countryIso2, String countryIso3, String countryName,
+                                   String countryFlag, Integer rateTypesCount) {
         this.codeIsoFrom = codeIsoFrom;
         this.nameIsoFrom = nameIsoFrom;
         this.symbolIsoFrom = symbolIsoFrom;
@@ -33,5 +35,6 @@ public class RemittanceRouteResultDto {
         this.countryIso3 = countryIso3;
         this.countryName = countryName;
         this.countryFlag = countryFlag;
+        this.rateTypesCount = rateTypesCount;
     }
 }

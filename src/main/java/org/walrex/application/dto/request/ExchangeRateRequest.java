@@ -23,6 +23,18 @@ public record ExchangeRateRequest(
     BigDecimal amount,
 
     /**
+     * Código del pais base (origen).
+     * Ejemplo: PER, ECU, CHL
+     */
+    @NotBlank(message = "Base country code is required")
+    @Size(min = 3, max = 3, message = "Base country must be exactly 3 characters")
+    @Pattern(
+            regexp = "^[A-Z]{3}$",
+            message = "Base currency must be a valid 3-letter code (uppercase)"
+    )
+    String baseCodeCountry,
+
+    /**
      * Código de la moneda base (origen).
      * Ejemplo: PEN, USD, VES
      */
@@ -33,6 +45,18 @@ public record ExchangeRateRequest(
             message = "Base currency must be a valid 3-letter code (uppercase)"
     )
     String baseCurrency,
+
+    /**
+     * Código del pais quote (destino).
+     * Ejemplo: PER, ECU, CHL
+     */
+    @NotBlank(message = "Quote country code is required")
+    @Size(min = 3, max = 3, message = "Base country must be exactly 3 characters")
+    @Pattern(
+            regexp = "^[A-Z]{3}$",
+            message = "Base currency must be a valid 3-letter code (uppercase)"
+    )
+    String quoteCodeCountry,
 
     /**
      * Código de la moneda cotizada (destino).

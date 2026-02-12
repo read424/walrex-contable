@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 
 /**
  * Puerto de salida para persistir tasas de cambio
@@ -43,4 +44,17 @@ public interface PriceExchangeOutputPort {
             BigDecimal averagePrice,
             LocalDate exchangeDate
     );
+
+    /**
+     * Busca la tasa activa más reciente por códigos de país y moneda.
+     *
+     * @param fromCountryCode Código ISO2 del país origen (ej: PE)
+     * @param fromCurrencyCode Código ISO3 de la moneda origen (ej: PEN)
+     * @param toCountryCode Código ISO2 del país destino (ej: VE)
+     * @param toCurrencyCode Código ISO3 de la moneda destino (ej: VES)
+     * @return Uni con Optional del amount_price, vacío si no existe
+     */
+    Uni<Optional<BigDecimal>> findActiveRateByCountriesAndCurrencies(
+            String fromCountryCode, String fromCurrencyCode,
+            String toCountryCode, String toCurrencyCode);
 }
