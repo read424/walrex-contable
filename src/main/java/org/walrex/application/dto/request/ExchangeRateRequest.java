@@ -27,10 +27,10 @@ public record ExchangeRateRequest(
      * Ejemplo: PER, ECU, CHL
      */
     @NotBlank(message = "Base country code is required")
-    @Size(min = 3, max = 3, message = "Base country must be exactly 3 characters")
+    @Size(min = 2, max = 2, message = "Base country must be exactly 2 characters")
     @Pattern(
-            regexp = "^[A-Z]{3}$",
-            message = "Base currency must be a valid 3-letter code (uppercase)"
+            regexp = "^[A-Z]{2}$",
+            message = "Base currency must be a valid 2-letter code (uppercase)"
     )
     String baseCodeCountry,
 
@@ -51,10 +51,10 @@ public record ExchangeRateRequest(
      * Ejemplo: PER, ECU, CHL
      */
     @NotBlank(message = "Quote country code is required")
-    @Size(min = 3, max = 3, message = "Base country must be exactly 3 characters")
+    @Size(min = 2, max = 2, message = "Base country must be exactly 2 characters")
     @Pattern(
-            regexp = "^[A-Z]{3}$",
-            message = "Base currency must be a valid 3-letter code (uppercase)"
+            regexp = "^[A-Z]{2}$",
+            message = "Base currency must be a valid 2-letter code (uppercase)"
     )
     String quoteCodeCountry,
 
