@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
@@ -35,14 +36,14 @@ public class ExchangeRateCache {
     private String currencyTo;
 
     /**
-     * ID del country_currency origen.
+     * Código ISO2 del país origen (ej: PE, EC, US).
      */
-    private Long countryCurrencyFromId;
+    private String countryFromCode;
 
     /**
-     * ID del country_currency destino.
+     * Código ISO2 del país destino (ej: VE, PE).
      */
-    private Long countryCurrencyToId;
+    private String countryToCode;
 
     /**
      * Timestamp de la última actualización.
@@ -50,32 +51,38 @@ public class ExchangeRateCache {
     private OffsetDateTime updatedAt;
 
     /**
-     * Genera la clave única para Redis basada en el par de monedas y rutas.
+     * Genera la clave única para Redis basada en país origen, moneda origen, país destino, moneda destino y fecha.
      *
-     * Formato: exchange_rate:{currencyFrom}:{currencyTo}:{countryCurrencyFromId}:{countryCurrencyToId}
+     * Formato: exchange_rate:{countryFromCode}:{currencyFrom}:{countryToCode}:{currencyTo}:{date}
+     *
+     * Incluir los códigos de país permite identificar fácilmente a qué países pertenece cada key
+     * (ej: PE:PEN:VE:VES). La fecha asegura un cache miss al inicio de cada nuevo día.
      *
      * @return Clave única para Redis
      */
     public String generateCacheKey() {
-        return String.format("exchange_rate:%s:%s:%d:%d",
-                currencyFrom, currencyTo, countryCurrencyFromId, countryCurrencyToId);
+        return String.format("exchange_rate:%s:%s:%s:%s:%s",
+                countryFromCode, currencyFrom, countryToCode, currencyTo,
+                LocalDate.now());
     }
 
     /**
      * Genera una clave de caché estática.
      *
+     * @param countryFromCode Código ISO2 del país origen (ej: PE, EC)
      * @param currencyFrom Código de moneda origen
+     * @param countryToCode Código ISO2 del país destino (ej: VE)
      * @param currencyTo Código de moneda destino
-     * @param countryCurrencyFromId ID de country_currency origen
-     * @param countryCurrencyToId ID de country_currency destino
+     * @param date Fecha para la cual se genera la clave
      * @return Clave única para Redis
      */
     public static String generateCacheKey(
+            String countryFromCode,
             String currencyFrom,
+            String countryToCode,
             String currencyTo,
-            Long countryCurrencyFromId,
-            Long countryCurrencyToId) {
-        return String.format("exchange_rate:%s:%s:%d:%d",
-                currencyFrom, currencyTo, countryCurrencyFromId, countryCurrencyToId);
+            LocalDate date) {
+        return String.format("exchange_rate:%s:%s:%s:%s:%s",
+                countryFromCode, currencyFrom, countryToCode, currencyTo, date);
     }
 }
