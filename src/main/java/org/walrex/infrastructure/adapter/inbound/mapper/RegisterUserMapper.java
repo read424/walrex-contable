@@ -32,6 +32,8 @@ public interface RegisterUserMapper {
     @Mapping(target = "pinHash", source = "request.pinHash")
     @Mapping(target = "pinAttempts", constant = "0")
     @Mapping(target = "active", constant = "1")
+    @Mapping(target = "biometricEnabled", constant = "false")
+    @Mapping(target = "deviceTrusted", constant = "false")
     User toUser(RegisterUserRequest request, Integer customerId);
 
     @Named("buildLastName")
