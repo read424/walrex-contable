@@ -11,11 +11,13 @@ import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.exception.ExchangeRateTimeoutException;
 import org.walrex.domain.model.ExchangeCalculation;
 import org.walrex.domain.model.ExchangeRate;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 import org.walrex.domain.model.RemittanceRoute;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -50,14 +52,23 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
     @Override
     public Uni<ExchangeCalculation> calculateExchangeRate(
             BigDecimal amount,
+            String baseCountry,
             String baseCurrency,
+            String quoteCountry,
             String quoteCurrency,
             BigDecimal margin) {
 
         log.info("Calculating exchange rate: {} {} -> {}, margin: {}%",
                 amount, baseCurrency, quoteCurrency, margin);
 
-        return findRemittanceRoute(baseCurrency, quoteCurrency)
+        return remittanceRoutePort.findAllActiveExchangeRateRoutes()
+                .map(routes -> routes.stream()
+                        .filter(route -> matchesCurrencyPair(route, baseCountry, baseCurrency, quoteCountry, quoteCurrency))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                String.format("No active remittance route found for %s (%s) -> %s (%s)",
+                                        baseCountry, baseCurrency, quoteCountry, quoteCurrency)))
+                )
                 .flatMap(route -> calculateCrossRate(amount, route, margin))
                 // Aplicar timeout proactivo de 25 segundos
                 .ifNoItem().after(CALCULATION_TIMEOUT).failWith(() -> {
@@ -78,121 +89,83 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
     }
 
     /**
-     * Busca la ruta de remesa configurada para el par de monedas.
+     * Verifica si la ruta coincide con el par solicitado.
      */
-    private Uni<RemittanceRoute> findRemittanceRoute(String baseCurrency, String quoteCurrency) {
-        return remittanceRoutePort.findAllActiveRoutes()
-                .map(routes -> routes.stream()
-                        .filter(route -> matchesCurrencyPair(route, baseCurrency, quoteCurrency))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                String.format("No active remittance route found for %s -> %s",
-                                        baseCurrency, quoteCurrency)))
-                );
+    private boolean matchesCurrencyPair(ExchangeRateRouteInfo route, String baseCountry, String baseCurrency, String quoteCountry, String quoteCurrency) {
+        return baseCountry.equalsIgnoreCase(route.getCountryFromCode()) && baseCurrency.equalsIgnoreCase(route.getCurrencyFromCode())
+                && quoteCountry.equalsIgnoreCase(route.getCountryToCode()) && quoteCurrency.equalsIgnoreCase(route.getCurrencyToCode());
     }
 
-    /**
-     * Verifica si la ruta coincide con el par de monedas solicitado.
-     */
-    private boolean matchesCurrencyPair(RemittanceRoute route, String baseCurrency, String quoteCurrency) {
-        return baseCurrency.equals(route.getCurrencyFromCode())
-                && quoteCurrency.equals(route.getCurrencyToCode());
-    }
-
-    /**
-     * Calcula la tasa cruzada usando USDT como intermediario.
-     */
     private Uni<ExchangeCalculation> calculateCrossRate(
             BigDecimal amount,
-            RemittanceRoute route,
+            ExchangeRateRouteInfo route,
             BigDecimal margin) {
 
-        // Paso 1: Comprar USDT con la moneda base
-        Uni<BigDecimal> buyPriceUni = fetchAverageBuyPrice(route);
-        Uni<List<String>> buyPaymentMethodsUni = paymentMethodPort
-                .findBinancePaymentCodesByCountryCurrency(route.getCountryCurrencyFromId());
+        log.info("Calculating cross rate for route: {}:{} -> {}:{}", 
+                route.getCountryFromCode(), route.getCurrencyFromCode(), 
+                route.getCountryToCode(), route.getCurrencyToCode());
 
-        // Paso 2: Vender USDT por la moneda cotizada
-        Uni<List<String>> sellPaymentMethodsUni = paymentMethodPort
-                .findBinancePaymentCodesByCountryCurrency(route.getCountryCurrencyToId());
+        // Consultar métodos de pago y tasas en paralelo
+        Uni<BigDecimal> buyPriceUni = fetchAveragePriceForPair(route, true);
+        Uni<BigDecimal> sellPriceUni = fetchAveragePriceForPair(route, false);
 
-        return Uni.combine().all()
-                .unis(buyPriceUni, buyPaymentMethodsUni, sellPaymentMethodsUni)
-                .asTuple()
-                .flatMap(tuple -> {
+        return Uni.combine().all().unis(buyPriceUni, sellPriceUni).asTuple()
+                .map(tuple -> {
                     BigDecimal avgBuyPrice = tuple.getItem1();
-                    List<String> buyPayMethods = tuple.getItem2();
-                    List<String> sellPayMethods = tuple.getItem3();
+                    BigDecimal avgSellPrice = tuple.getItem2();
 
                     // Calcular USDT recibido
                     BigDecimal usdtReceived = calculateUsdtReceived(amount, avgBuyPrice);
 
-                    log.info("USDT received from buying with {} {}: {} USDT",
-                            amount, route.getCurrencyFromCode(), usdtReceived);
-
-                    // Obtener precio de venta
-                    return fetchAverageSellPrice(route, usdtReceived, sellPayMethods)
-                            .map(avgSellPrice -> buildExchangeCalculation(
-                                    amount,
-                                    route.getCurrencyFromCode(),
-                                    route.getCurrencyToCode(),
-                                    avgBuyPrice,
-                                    avgSellPrice,
-                                    usdtReceived,
-                                    margin
-                            ));
+                    return buildExchangeCalculation(
+                            amount,
+                            route.getCurrencyFromCode(),
+                            route.getCurrencyToCode(),
+                            avgBuyPrice,
+                            avgSellPrice,
+                            usdtReceived,
+                            margin
+                    );
                 });
     }
 
     /**
-     * Obtiene el precio promedio de compra de USDT.
+     * Obtiene el precio promedio (Top 5) para compra o venta.
      */
-    private Uni<BigDecimal> fetchAverageBuyPrice(RemittanceRoute route) {
-        return paymentMethodPort.findBinancePaymentCodesByCountryCurrency(route.getCountryCurrencyFromId())
+    private Uni<BigDecimal> fetchAveragePriceForPair(ExchangeRateRouteInfo route, boolean isBuy) {
+        Long countryCurrencyId = isBuy ? route.getCountryCurrencyFromId() : route.getCountryCurrencyToId();
+        String currency = isBuy ? route.getCurrencyFromCode() : route.getCurrencyToCode();
+        String tradeType = isBuy ? TRADE_TYPE_BUY : TRADE_TYPE_SELL;
+
+        return paymentMethodPort.findBinancePaymentCodesByCountryCurrency(countryCurrencyId)
                 .flatMap(payTypes -> exchangeRateProvider.fetchExchangeRates(
                         USDT,
-                        route.getCurrencyFromCode(),
-                        TRADE_TYPE_BUY,
+                        currency,
+                        tradeType,
                         payTypes,
                         null
                 ))
-                .map(this::calculateAveragePrice);
+                .map(rates -> calculateTop5Average(rates, isBuy));
     }
 
     /**
-     * Obtiene el precio promedio de venta de USDT.
+     * Calcula el promedio de las 5 mejores tasas.
      */
-    private Uni<BigDecimal> fetchAverageSellPrice(
-            RemittanceRoute route,
-            BigDecimal usdtAmount,
-            List<String> payTypes) {
-
-        return exchangeRateProvider.fetchExchangeRates(
-                        USDT,
-                        route.getCurrencyToCode(),
-                        TRADE_TYPE_SELL,
-                        payTypes,
-                        null,
-                        usdtAmount
-                )
-                .map(this::calculateAveragePrice);
-    }
-
-    /**
-     * Calcula el precio promedio de los primeros N precios.
-     */
-    private BigDecimal calculateAveragePrice(List<ExchangeRate> rates) {
+    private BigDecimal calculateTop5Average(List<ExchangeRate> rates, boolean isBuy) {
         if (rates == null || rates.isEmpty()) {
-            throw new IllegalStateException("No exchange rates available from provider");
+            throw new IllegalStateException("No exchange rates available for " + (isBuy ? "BUY" : "SELL"));
         }
 
-        BigDecimal sum = rates.stream()
+        List<BigDecimal> topPrices = rates.stream()
+                .sorted(isBuy 
+                        ? Comparator.comparing(ExchangeRate::price)           // Compra: más barato primero
+                        : Comparator.comparing(ExchangeRate::price).reversed()) // Venta: más caro primero
                 .limit(TOP_PRICES_LIMIT)
                 .map(ExchangeRate::price)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .toList();
 
-        int count = Math.min(rates.size(), TOP_PRICES_LIMIT);
-        return sum.divide(BigDecimal.valueOf(count), SCALE, RoundingMode.HALF_UP);
+        BigDecimal sum = topPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(topPrices.size()), SCALE, RoundingMode.HALF_UP);
     }
 
     /**
