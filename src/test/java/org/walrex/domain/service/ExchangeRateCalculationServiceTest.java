@@ -11,7 +11,7 @@ import org.walrex.application.port.output.PaymentMethodQueryPort;
 import org.walrex.application.port.output.RemittanceRouteOutputPort;
 import org.walrex.domain.model.ExchangeCalculation;
 import org.walrex.domain.model.ExchangeRate;
-import org.walrex.domain.model.RemittanceRoute;
+import org.walrex.domain.model.ExchangeRateRouteInfo;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,21 +44,25 @@ class ExchangeRateCalculationServiceTest {
     void shouldCalculateExchangeRateSuccessfully() {
         // Arrange
         BigDecimal amount = BigDecimal.valueOf(100.00);
+        String baseCountry = "PE";
         String baseCurrency = "PEN";
+        String quoteCountry = "VE";
         String quoteCurrency = "VES";
         BigDecimal margin = BigDecimal.valueOf(5.0);
 
-        RemittanceRoute route = RemittanceRoute.builder()
+        ExchangeRateRouteInfo route = ExchangeRateRouteInfo.builder()
                 .countryCurrencyFromId(1L)
                 .currencyFromId(1)
+                .countryFromCode("PE")
                 .currencyFromCode("PEN")
                 .countryCurrencyToId(2L)
                 .currencyToId(2)
+                .countryToCode("VE")
                 .currencyToCode("VES")
                 .intermediaryAsset("USDT")
                 .build();
 
-        List<RemittanceRoute> routes = List.of(route);
+        List<ExchangeRateRouteInfo> routes = List.of(route);
 
         // Mock payment methods
         List<String> penPaymentMethods = List.of("Yape", "Plin", "BancoDeCredito");
@@ -82,7 +86,7 @@ class ExchangeRateCalculationServiceTest {
                 createMockRate("36.52")
         );
 
-        when(remittanceRoutePort.findAllActiveRoutes()).thenReturn(Uni.createFrom().item(routes));
+        when(remittanceRoutePort.findAllActiveExchangeRateRoutes()).thenReturn(Uni.createFrom().item(routes));
         when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(1L))
                 .thenReturn(Uni.createFrom().item(penPaymentMethods));
         when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(2L))
@@ -91,12 +95,12 @@ class ExchangeRateCalculationServiceTest {
                 eq("USDT"), eq("PEN"), eq("BUY"), eq(penPaymentMethods), isNull()))
                 .thenReturn(Uni.createFrom().item(buyRates));
         when(exchangeRateProvider.fetchExchangeRates(
-                eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull(), any(BigDecimal.class)))
+                eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull()))
                 .thenReturn(Uni.createFrom().item(sellRates));
 
         // Act
         ExchangeCalculation result = service
-                .calculateExchangeRate(amount, baseCurrency, quoteCurrency, margin)
+                .calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
                 .await()
                 .indefinitely();
 
@@ -127,44 +131,48 @@ class ExchangeRateCalculationServiceTest {
     void shouldThrowExceptionWhenRouteNotFound() {
         // Arrange
         BigDecimal amount = BigDecimal.valueOf(100.00);
+        String baseCountry = "PEN";
         String baseCurrency = "USD";
-        String quoteCurrency = "EUR";
+        String quoteCountry = "VES";
+        String quoteCurrency = "VES";
         BigDecimal margin = BigDecimal.valueOf(5.0);
 
-        when(remittanceRoutePort.findAllActiveRoutes())
+        when(remittanceRoutePort.findAllActiveExchangeRateRoutes())
                 .thenReturn(Uni.createFrom().item(Collections.emptyList()));
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                service.calculateExchangeRate(amount, baseCurrency, quoteCurrency, margin)
+                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
                         .await()
                         .indefinitely()
         );
 
         assertTrue(exception.getMessage().contains("No active remittance route found"));
-        assertTrue(exception.getMessage().contains("USD -> EUR"));
+        assertTrue(exception.getMessage().contains("PEN (USD) -> VES (VES)"));
     }
 
     @Test
     void shouldThrowExceptionWhenNoExchangeRatesAvailable() {
         // Arrange
         BigDecimal amount = BigDecimal.valueOf(100.00);
+        String baseCountry = "PE";
         String baseCurrency = "PEN";
+        String quoteCountry = "VES";
         String quoteCurrency = "VES";
         BigDecimal margin = BigDecimal.valueOf(5.0);
 
-        RemittanceRoute route = RemittanceRoute.builder()
-                .countryCurrencyFromId(1L)
-                .currencyFromId(1)
-                .currencyFromCode("PEN")
-                .countryCurrencyToId(2L)
-                .currencyToId(2)
-                .currencyToCode("VES")
-                .intermediaryAsset("USDT")
-                .build();
-
-        when(remittanceRoutePort.findAllActiveRoutes())
-                .thenReturn(Uni.createFrom().item(List.of(route)));
+        when(remittanceRoutePort.findAllActiveExchangeRateRoutes())
+                .thenReturn(Uni.createFrom().item(List.of(ExchangeRateRouteInfo.builder()
+                        .countryCurrencyFromId(1L)
+                        .currencyFromId(1)
+                        .countryFromCode("PE")
+                        .currencyFromCode("PEN")
+                        .countryCurrencyToId(2L)
+                        .currencyToId(2)
+                        .countryToCode("VES")
+                        .currencyToCode("VES")
+                        .intermediaryAsset("USDT")
+                        .build())));
         when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(anyLong()))
                 .thenReturn(Uni.createFrom().item(List.of("Yape")));
         when(exchangeRateProvider.fetchExchangeRates(any(), any(), any(), any(), any()))
@@ -172,7 +180,7 @@ class ExchangeRateCalculationServiceTest {
 
         // Act & Assert
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                service.calculateExchangeRate(amount, baseCurrency, quoteCurrency, margin)
+                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
                         .await()
                         .indefinitely()
         );
