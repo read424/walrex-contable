@@ -14,4 +14,5 @@ import java.util.List;
 public class DestinationCountryResponse {
     private CountryInfoResponse country;
     private List<CurrencyInfoResponse> currencies;
+    private Integer rateTypesCount;
 }
