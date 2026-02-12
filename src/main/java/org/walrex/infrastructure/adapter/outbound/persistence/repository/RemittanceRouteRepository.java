@@ -32,6 +32,24 @@ public class RemittanceRouteRepository implements PanacheRepositoryBase<Remittan
     }
 
     /**
+     * Obtiene todas las rutas activas con country_currencies y sus relaciones para exchange rates.
+     * No incluye JOIN FETCH rc.country ya que no se necesita para tasas de cambio.
+     */
+    public Uni<List<RemittanceRouteEntity>> findAllActiveExchangeRateRoutes() {
+        return find(
+                "SELECT r FROM RemittanceRouteEntity r " +
+                        "JOIN FETCH r.remittanceCountry rc " +
+                        "JOIN FETCH r.countryCurrencyFrom ccFrom " +
+                        "JOIN FETCH ccFrom.country " +
+                        "JOIN FETCH ccFrom.currency " +
+                        "JOIN FETCH r.countryCurrencyTo ccTo " +
+                        "JOIN FETCH ccTo.country " +
+                        "JOIN FETCH ccTo.currency " +
+                        "WHERE r.isActive = '1' AND rc.isActive = '1'"
+        ).list();
+    }
+
+    /**
      * Busca una ruta específica entre dos country_currencies
      */
     public Uni<RemittanceRouteEntity> findByCountryCurrencies(
