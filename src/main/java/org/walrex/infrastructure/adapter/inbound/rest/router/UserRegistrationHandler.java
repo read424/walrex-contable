@@ -42,6 +42,18 @@ public class UserRegistrationHandler {
             if (!validateRequest(rc, request)) {
                 return Uni.createFrom().voidItem();
             }
+
+            // Validación manual: si es PHONE, el email es obligatorio y debe ser válido
+            if (org.walrex.domain.model.IdentificationMethod.PHONE.equals(request.getIdentificationMethod())) {
+                if (request.getEmail() == null || request.getEmail().isBlank()) {
+                    handleBadRequest(rc, "El email es requerido cuando el método de identificación es PHONE");
+                    return Uni.createFrom().voidItem();
+                }
+                if (!isValidEmail(request.getEmail())) {
+                    handleBadRequest(rc, "El formato del email es inválido");
+                    return Uni.createFrom().voidItem();
+                }
+            }
             log.debug("Request validation passed");
 
             return registerUserUseCase.register(request)
@@ -190,5 +202,14 @@ public class UserRegistrationHandler {
                 .setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
                 .putHeader("Content-Type", "application/json")
                 .end(error.encode());
+    }
+
+    /**
+     * Valida el formato del email.
+     */
+    private boolean isValidEmail(String email) {
+        if (email == null) return false;
+        String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$";
+        return email.matches(emailRegex);
     }
 }
