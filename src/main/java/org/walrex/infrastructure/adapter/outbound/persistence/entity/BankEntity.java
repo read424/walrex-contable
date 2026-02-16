@@ -17,7 +17,7 @@ import java.time.OffsetDateTime;
 @ToString
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "banks")
+@Table(name = "financial_institution")
 public class BankEntity extends PanacheEntityBase {
 
     @Id
