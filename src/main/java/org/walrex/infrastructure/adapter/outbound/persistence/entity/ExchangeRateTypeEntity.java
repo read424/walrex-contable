@@ -41,7 +41,7 @@ public class ExchangeRateTypeEntity extends PanacheEntityBase {
     @Column(name = "base_currency_id")
     private Integer baseCurrencyId;
 
-    @Column(name = "is_active", nullable = false, length = 1)
+    @Column(name = "is_active", nullable = false, columnDefinition = "char(1)")
     private String isActive;
 
     @Column(name = "display_order", nullable = false)
