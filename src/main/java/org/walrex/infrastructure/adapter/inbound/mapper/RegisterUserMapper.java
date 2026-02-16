@@ -52,9 +52,10 @@ public interface RegisterUserMapper {
 
     @Named("resolveEmail")
     default String resolveEmail(RegisterUserRequest req) {
-        return req.getIdentificationMethod() == IdentificationMethod.EMAIL
-                ? req.getReferenceId()
-                : null;
+        if (req.getIdentificationMethod() == IdentificationMethod.EMAIL) {
+            return req.getReferenceId();
+        }
+        return req.getEmail();
     }
 
     @Named("resolvePhone")
