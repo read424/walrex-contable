@@ -30,10 +30,10 @@ public class PriceExchangeEntity extends PanacheEntityBase {
     @Column(name = "type_operation", length = 1, nullable = false)
     private String typeOperation;  // '3' para REMESAS
 
-    @Column(name = "id_currency_base", nullable = false)//aqui ahora iran los id de country_currencies
+    @Column(name = "id_currency_base", nullable = false, columnDefinition = "bigint")//aqui ahora iran los id de country_currencies
     private Integer idCurrencyBase;  // Ej: 5 (USD/USDT)
 
-    @Column(name = "id_currency_quote", nullable = false)//aqui ahora iran los id de country_currencies
+    @Column(name = "id_currency_quote", nullable = false, columnDefinition = "bigint")//aqui ahora iran los id de country_currencies
     private Integer idCurrencyQuote;  // Ej: 4 (PEN) o 3 (VES)
 
     @Column(name = "amount_price", precision = 13, scale = 5, nullable = false)
