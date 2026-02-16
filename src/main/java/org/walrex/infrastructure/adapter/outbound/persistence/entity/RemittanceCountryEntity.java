@@ -24,7 +24,7 @@ public class RemittanceCountryEntity extends PanacheEntityBase {
     @JoinColumn(name = "id_country", nullable = false, unique = true)
     private CountryEntity country;
 
-    @Column(name = "is_active", length = 1, nullable = false)
+    @Column(name = "is_active", nullable = false, columnDefinition = "char(1)")
     private String isActive = "1";
 
     @Column(name = "created_at", nullable = false, updatable = false)
