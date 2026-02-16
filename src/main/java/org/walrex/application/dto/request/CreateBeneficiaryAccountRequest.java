@@ -8,31 +8,22 @@ import lombok.Builder;
 @Builder
 public record CreateBeneficiaryAccountRequest(
         @NotNull
-        Long customerId,
+        Long beneficiaryId,
+
+        @NotNull
+        Integer payoutRailId,
 
         Long bankId,
 
-        Integer typeAccountId,
-
-        @NotBlank
-        @Size(max = 25)
+        @Size(max = 40)
         String accountNumber,
 
-        @Size(max = 60)
-        String beneficiaryLastName,
-
-        @Size(max = 50)
-        String beneficiarySurname,
-
-        @NotBlank
-        @Size(max = 15)
-        String idNumber,
+        @Size(max = 20)
+        String phoneNumber,
 
         @NotNull
-        Integer typeOperationId,
+        Integer currencyId,
 
-        @NotBlank
-        @Size(min = 1, max = 1)
-        String isAccountMe
+        Boolean isFavorite
 ) {
 }
