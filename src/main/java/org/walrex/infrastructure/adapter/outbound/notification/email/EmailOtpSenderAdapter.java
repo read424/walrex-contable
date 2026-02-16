@@ -12,9 +12,11 @@ import org.jboss.logging.Logger;
 import org.walrex.application.port.output.OtpSenderPort;
 import org.walrex.domain.model.OtpChannel;
 import org.walrex.domain.model.OtpPurpose;
+import org.walrex.infrastructure.config.qualifier.Email;
 
 @Slf4j
 @ApplicationScoped
+@Email
 public class EmailOtpSenderAdapter implements OtpSenderPort {
 
     private static final Logger LOG = Logger.getLogger(EmailOtpSenderAdapter.class);
