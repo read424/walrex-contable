@@ -26,7 +26,7 @@ public class CategoryProductEntity extends PanacheEntityBase {
 
     private String name;
 
-    @Column(name = "details")
+    @Column(name = "details", columnDefinition = "TEXT")
     private String details;
 
     @Column(name = "parent_id", insertable = false, updatable = false)

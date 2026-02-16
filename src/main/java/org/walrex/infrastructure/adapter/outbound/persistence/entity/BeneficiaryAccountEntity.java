@@ -7,10 +7,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "accounts_beneficiary")
+@Table(name = "beneficiary_account")
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,45 +19,45 @@ public class BeneficiaryAccountEntity extends PanacheEntityBase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public Integer id;
+    public Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_client", nullable = false)
-    public CustomerEntity customer;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "beneficiary_id", nullable = false)
+    public BeneficiaryEntity beneficiary;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_bank")
-    public BankEntity bank;
+    @Column(name = "payout_rail_id", nullable = false)
+    public Integer payoutRailId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_type_account")
-    public TypeAccountBankEntity typeAccount;
+    @Column(name = "bank_id")
+    public Long bankId;
 
-    @Column(name = "number_account", nullable = false, length = 25)
+    @Column(name = "account_number", length = 40)
     public String accountNumber;
 
-    @Column(name = "last_name_benef", length = 60)
-    public String beneficiaryLastName;
+    @Column(name = "phone_number", length = 20)
+    public String phoneNumber;
 
-    @Column(name = "surname_benef", length = 50)
-    public String beneficiarySurname;
+    @Column(name = "currency_id", nullable = false)
+    public Integer currencyId;
 
-    @Column(name = "number_id", nullable = false, length = 15)
-    public String idNumber;
-
-    @Column(length = 1)
-    public String status;
+    @Column(name = "is_favorite")
+    @Builder.Default
+    public Boolean isFavorite = false;
 
     @Column(name = "created_at", updatable = false)
-    public LocalDateTime createdAt;
+    public OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
-    public LocalDateTime updatedAt;
+    public OffsetDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_type_operation")
-    public TypeOperationEntity typeOperation;
+    @PrePersist
+    protected void onCreate() {
+        createdAt = OffsetDateTime.now();
+        updatedAt = OffsetDateTime.now();
+    }
 
-    @Column(name = "is_account_me", nullable = false, length = 1)
-    public String isAccountMe;
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = OffsetDateTime.now();
+    }
 }

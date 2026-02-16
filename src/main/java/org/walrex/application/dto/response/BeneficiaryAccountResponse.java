@@ -3,23 +3,20 @@ package org.walrex.application.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 
+import java.time.OffsetDateTime;
+
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record BeneficiaryAccountResponse(
-        Integer id,
-        Long customerId,
-        String customerName,
+        Long id,
+        Long beneficiaryId,
+        Integer payoutRailId,
         Long bankId,
-        String bankName,
-        Integer typeAccountId,
-        String typeAccountName,
         String accountNumber,
-        String beneficiaryLastName,
-        String beneficiarySurname,
-        String idNumber,
-        String status,
-        Integer typeOperationId,
-        String typeOperationName,
-        String isAccountMe
+        String phoneNumber,
+        Integer currencyId,
+        Boolean isFavorite,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt
 ) {
 }

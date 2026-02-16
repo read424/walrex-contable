@@ -36,7 +36,7 @@ public class RemittanceRouteEntity extends PanacheEntityBase {
     @Column(name = "intermediary_asset", length = 10, nullable = false)
     private String intermediaryAsset = "USDT";
 
-    @Column(name = "is_active", length = 1, nullable = false)
+    @Column(name = "is_active", nullable = false, columnDefinition = "char(1)")
     private String isActive = "1";
 
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -77,7 +77,7 @@ public class RegisterUserService implements RegisterUserUseCase {
 
                                             // PASO 5: Mapear request a User
                                             User user = registerUserMapper.toUser(request, customerId);
-                                            user.setUsername(target);
+                                            user.setUsername(customer.getEmail());
                                             log.debug("Mapped to User: username={}, type={}",
                                                     user.getUsername(),
                                                     user.getUsernameType());

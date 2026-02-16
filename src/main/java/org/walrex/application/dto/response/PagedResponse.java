@@ -50,7 +50,12 @@ public record PagedResponse<T>(
         /**
          * Indica si hay contenido en esta página.
          */
-        boolean empty
+        boolean empty,
+
+        /**
+         * Indica si hay más páginas disponibles (útil para scroll infinito).
+         */
+        boolean hasMore
 
 ) {
     /**
@@ -68,7 +73,8 @@ public record PagedResponse<T>(
                 totalPages,
                 page == 1,                          // first (1-indexed)
                 page >= totalPages,                 // last (1-indexed)
-                content.isEmpty()                    // empty
+                content.isEmpty(),                   // empty
+                (long) page * size < totalElements  // hasMore
         );
     }
 }

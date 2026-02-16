@@ -58,7 +58,7 @@ public class ProductTemplateEntity extends PanacheEntityBase {
      * Tipo de producto (storable, consumable, service)
      * Usa ProductTypeConverter para conversión de enum a string
      */
-    @Column(name = "type_product", nullable = false, length = 20)
+    @Column(name = "type_product", nullable = false, columnDefinition = "product_type")
     @Convert(converter = ProductTypeConverter.class)
     private ProductType type;
 

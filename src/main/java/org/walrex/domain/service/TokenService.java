@@ -45,6 +45,7 @@ public class TokenService {
                 .subject(user.getId().toString())
                 .upn(user.getUsername())
                 .groups(new HashSet<>(Arrays.asList("user")))
+                .claim("clientId", user.getCustomerId())
                 .expiresAt(accessTokenExpiration)
                 .signWithSecret(secret);
 

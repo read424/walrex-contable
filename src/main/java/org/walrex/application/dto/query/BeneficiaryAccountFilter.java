@@ -10,5 +10,4 @@ import lombok.Setter;
 public class BeneficiaryAccountFilter {
     private Long customerId;
     private String accountNumber;
-    private String idNumber;
 }

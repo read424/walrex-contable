@@ -10,6 +10,6 @@ import java.util.Optional;
 
 public interface BeneficiaryAccountQueryPort {
     Uni<PagedResult<BeneficiaryAccount>> findAll(PageRequest pageRequest, BeneficiaryAccountFilter filter);
-    Uni<Optional<BeneficiaryAccount>> findById(Integer id);
-    Uni<Boolean> existsByAccountNumber(String accountNumber, Integer excludeId);
+    Uni<Optional<BeneficiaryAccount>> findById(Long id);
+    Uni<Boolean> existsByAccountNumber(String accountNumber, Long excludeId);
 }

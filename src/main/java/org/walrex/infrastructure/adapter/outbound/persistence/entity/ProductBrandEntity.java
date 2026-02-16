@@ -25,7 +25,7 @@ public class ProductBrandEntity extends PanacheEntityBase {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "details")
+    @Column(name = "details", columnDefinition = "TEXT")
     private String details;
 
     @Column(name = "created_at")

@@ -8,7 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -31,19 +31,19 @@ public class OcupacionEntity extends PanacheEntityBase {
     @Column(nullable = false, unique = true, length = 5)
     public String codigo;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = 120)
     public String nombre;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column
     public Integer status = 1;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false, nullable = false)
-    public LocalDateTime createdAt;
+    @Column(name = "created_at", updatable = false)
+    public OffsetDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    public LocalDateTime updatedAt;
+    @Column(name = "updated_at")
+    public OffsetDateTime updatedAt;
 
 }

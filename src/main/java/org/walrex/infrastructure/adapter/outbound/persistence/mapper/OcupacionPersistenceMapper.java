@@ -8,6 +8,10 @@ import org.mapstruct.ReportingPolicy;
 import org.walrex.domain.model.Ocupacion;
 import org.walrex.infrastructure.adapter.outbound.persistence.entity.OcupacionEntity;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Mapper(
         componentModel = MappingConstants.ComponentModel.CDI,
         unmappedTargetPolicy = ReportingPolicy.IGNORE
@@ -22,4 +26,12 @@ public interface OcupacionPersistenceMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDomain(Ocupacion domain, @MappingTarget OcupacionEntity entity);
+
+    default LocalDateTime map(OffsetDateTime value) {
+        return value != null ? value.toLocalDateTime() : null;
+    }
+
+    default OffsetDateTime map(LocalDateTime value) {
+        return value != null ? value.atOffset(ZoneOffset.UTC) : null;
+    }
 }

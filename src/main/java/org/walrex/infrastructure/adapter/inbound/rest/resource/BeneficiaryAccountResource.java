@@ -74,10 +74,9 @@ public class BeneficiaryAccountResource {
             @Parameter(description = "Tamaño de página", example = "10") @QueryParam("size") @DefaultValue("10") int size,
             @Parameter(description = "ID del cliente") @QueryParam("customerId") Long customerId,
             @Parameter(description = "Número de cuenta") @QueryParam("accountNumber") String accountNumber,
-            @Parameter(description = "Número de identificación") @QueryParam("idNumber") String idNumber,
             @Parameter(description = "Campo de ordenamiento", example = "id") @QueryParam("sortBy") @DefaultValue("id") String sortBy,
             @Parameter(description = "Dirección de ordenamiento (ASC/DESC)", example = "ASC") @QueryParam("sortDirection") @DefaultValue("ASC") String sortDirection) {
-        // Convert 1-based page to 0-based
+        
         int pageIndex = Math.max(0, page - 1);
 
         PageRequest.SortDirection dir = "DESC".equalsIgnoreCase(sortDirection)
@@ -94,7 +93,6 @@ public class BeneficiaryAccountResource {
         BeneficiaryAccountFilter filter = BeneficiaryAccountFilter.builder()
                 .customerId(customerId)
                 .accountNumber(accountNumber)
-                .idNumber(idNumber)
                 .build();
 
         return listUC.list(pageRequest, filter)
@@ -112,7 +110,7 @@ public class BeneficiaryAccountResource {
             @APIResponse(responseCode = "500", description = "Error interno del servidor", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
     public Uni<Response> getById(
-            @Parameter(description = "ID de la cuenta de beneficiario", required = true) @PathParam("id") Integer id) {
+            @Parameter(description = "ID de la cuenta de beneficiario", required = true) @PathParam("id") Long id) {
         return getUC.findById(id)
                 .map(beneficiaryAccount -> dtoMapper.toResponse(beneficiaryAccount))
                 .map(response -> Response.ok(response).build())
@@ -146,10 +144,6 @@ public class BeneficiaryAccountResource {
     public Uni<Response> create(
             @RequestBody(description = "Datos de la nueva cuenta de beneficiario", required = true) @Valid CreateBeneficiaryAccountRequest request) {
         BeneficiaryAccount beneficiaryAccount = requestMapper.toModel(request);
-        // Ensure status is set to default '1' for new accounts if not provided
-        if (beneficiaryAccount.getStatus() == null) {
-            beneficiaryAccount.setStatus("1");
-        }
         return createUC.create(beneficiaryAccount)
                 .map(created -> dtoMapper.toResponse(created))
                 .map(response -> Response.created(URI.create("/api/v1/beneficiary-accounts/" + response.id()))
@@ -170,7 +164,7 @@ public class BeneficiaryAccountResource {
             @APIResponse(responseCode = "500", description = "Error interno del servidor", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
     public Uni<Response> update(
-            @Parameter(description = "ID de la cuenta de beneficiario a actualizar", required = true) @PathParam("id") Integer id,
+            @Parameter(description = "ID de la cuenta de beneficiario a actualizar", required = true) @PathParam("id") Long id,
             @RequestBody(description = "Datos actualizados de la cuenta de beneficiario", required = true) @Valid UpdateBeneficiaryAccountRequest request) {
         BeneficiaryAccount beneficiaryAccount = requestMapper.toModel(request);
         return updateUC.update(id, beneficiaryAccount)
@@ -189,7 +183,7 @@ public class BeneficiaryAccountResource {
             @APIResponse(responseCode = "500", description = "Error interno del servidor", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ErrorResponse.class)))
     })
     public Uni<Response> delete(
-            @Parameter(description = "ID de la cuenta de beneficiario a eliminar", required = true) @PathParam("id") Integer id) {
+            @Parameter(description = "ID de la cuenta de beneficiario a eliminar", required = true) @PathParam("id") Long id) {
         return deleteUC.delete(id)
                 .map(unused -> Response.noContent().build())
                 .onFailure().recoverWithItem(this::mapExceptionToResponse);
@@ -204,12 +198,10 @@ public class BeneficiaryAccountResource {
     })
     public Multi<BeneficiaryAccountResponse> stream(
             @Parameter(description = "ID del cliente") @QueryParam("customerId") Long customerId,
-            @Parameter(description = "Número de cuenta") @QueryParam("accountNumber") String accountNumber,
-            @Parameter(description = "Número de identificación") @QueryParam("idNumber") String idNumber) {
+            @Parameter(description = "Número de cuenta") @QueryParam("accountNumber") String accountNumber) {
         BeneficiaryAccountFilter filter = BeneficiaryAccountFilter.builder()
                 .customerId(customerId)
                 .accountNumber(accountNumber)
-                .idNumber(idNumber)
                 .build();
         return listUC.streamWithFilter(filter);
     }

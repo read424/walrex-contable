@@ -43,7 +43,7 @@ public class UserEntity extends PanacheEntityBase {
     private OffsetDateTime pinLockedUntil;
 
     @Builder.Default
-    @Column(name = "status", nullable = false)
+    @Column(name = "status")
     private Integer active = 1;
 
     @Builder.Default

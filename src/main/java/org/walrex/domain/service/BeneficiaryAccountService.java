@@ -49,14 +49,14 @@ public class BeneficiaryAccountService implements
 
     @Override
     public Uni<BeneficiaryAccount> create(BeneficiaryAccount beneficiaryAccount) {
-        log.info("Creating beneficiary account for customer ID: {}", beneficiaryAccount.getCustomer().getId());
+        log.info("Creating beneficiary account for beneficiary ID: {}", beneficiaryAccount.getBeneficiary() != null ? beneficiaryAccount.getBeneficiary().getId() : "null");
         return validateUniqueness(beneficiaryAccount.getAccountNumber(), null)
                 .onItem().transformToUni(v -> repositoryPort.save(beneficiaryAccount))
                 .onItem().call(cachePort::invalidateAll);
     }
 
     @Override
-    public Uni<BeneficiaryAccount> update(Integer id, BeneficiaryAccount beneficiaryAccount) {
+    public Uni<BeneficiaryAccount> update(Long id, BeneficiaryAccount beneficiaryAccount) {
         log.info("Updating beneficiary account id: {}", id);
         return validateUniqueness(beneficiaryAccount.getAccountNumber(), id)
                 .onItem().transformToUni(v -> {
@@ -67,8 +67,8 @@ public class BeneficiaryAccountService implements
     }
 
     @Override
-    public Uni<Void> delete(Integer id) {
-        log.info("Soft deleting beneficiary account id: {}", id);
+    public Uni<Void> delete(Long id) {
+        log.info("Deleting beneficiary account id: {}", id);
         return repositoryPort.softDelete(id)
                 .onItem().transformToUni(deleted -> {
                     if (!deleted) {
@@ -79,8 +79,7 @@ public class BeneficiaryAccountService implements
     }
 
     @Override
-    public Uni<BeneficiaryAccount> findById(Integer id) {
-        // Caching for single items is not implemented in the generic adapter, so we go directly to the DB
+    public Uni<BeneficiaryAccount> findById(Long id) {
         return queryPort.findById(id)
                 .onItem().transform(optional -> optional.orElseThrow(
                         () -> new BeneficiaryAccountNotFoundException(id)));
@@ -116,7 +115,6 @@ public class BeneficiaryAccountService implements
 
     @Override
     public Multi<BeneficiaryAccountResponse> streamAll() {
-        // Caching for streams is not part of the current pattern, bypassing.
         return queryPort.findAll(PageRequest.builder().page(0).size(Integer.MAX_VALUE).build(), null)
                 .onItem().transformToMulti(pagedResult -> Multi.createFrom().iterable(pagedResult.content()))
                 .onItem().transform(dtoMapper::toResponse);
@@ -124,7 +122,6 @@ public class BeneficiaryAccountService implements
 
     @Override
     public Multi<BeneficiaryAccountResponse> streamWithFilter(BeneficiaryAccountFilter filter) {
-        // Caching for streams is not part of the current pattern, bypassing.
         return queryPort.findAll(PageRequest.builder().page(0).size(Integer.MAX_VALUE).build(), filter)
                 .onItem().transformToMulti(pagedResult -> Multi.createFrom().iterable(pagedResult.content()))
                 .onItem().transform(dtoMapper::toResponse);
@@ -151,7 +148,7 @@ public class BeneficiaryAccountService implements
                         .toList());
     }
 
-    private Uni<Void> validateUniqueness(String accountNumber, Integer excludeId) {
+    private Uni<Void> validateUniqueness(String accountNumber, Long excludeId) {
         return queryPort.existsByAccountNumber(accountNumber, excludeId)
                 .onItem().transformToUni(exists -> {
                     if (exists) {

@@ -41,11 +41,11 @@ public class JournalEntryEntity extends PanacheEntityBase {
     @Column(name = "book_correlative")
     private Integer bookCorrelative;
 
-    @Column(name = "book_type", nullable = false)
+    @Column(name = "book_type", nullable = false, columnDefinition = "accounting_book_type")
     private AccountingBookType bookType;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20, nullable = false)
+    @Column(nullable = false, columnDefinition = "entry_status")
     private EntryStatus status;
 
     @OneToMany(mappedBy = "journalEntry", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)

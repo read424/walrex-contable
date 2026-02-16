@@ -54,4 +54,12 @@ public class RegisterUserRequest {
 
     @NotNull(message = "El país es requerido")
     private Integer countryId;
+
+    @NotBlank(message = "El tipo de documento es requerido")
+    private String documentType;
+
+    @NotBlank(message = "El número de documento es requerido")
+    private String documentNumber;
+
+    private String email;
 }

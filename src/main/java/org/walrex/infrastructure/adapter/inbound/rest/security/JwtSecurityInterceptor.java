@@ -123,6 +123,44 @@ public class JwtSecurityInterceptor {
     }
 
     /**
+     * Autentica a partir del header Authorization y extrae el clientId.
+     *
+     * @param authHeader valor del header Authorization
+     * @return Optional con el clientId, o empty si falló
+     */
+    public Optional<Integer> authenticateAndGetClientId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            log.warn("Missing or malformed Authorization header");
+            return Optional.empty();
+        }
+
+        String token = authHeader.substring(BEARER_PREFIX.length());
+
+        try {
+            HmacKey key = new HmacKey(secret.getBytes(StandardCharsets.UTF_8));
+            JwtConsumer jwtConsumer = new JwtConsumerBuilder()
+                    .setRequireExpirationTime()
+                    .setRequireSubject()
+                    .setExpectedIssuer(expectedIssuer)
+                    .setVerificationKey(key)
+                    .build();
+
+            JwtClaims claims = jwtConsumer.processToClaims(token);
+            Object clientIdObj = claims.getClaimValue("clientId");
+            if (clientIdObj == null) {
+                log.warn("Missing clientId claim in token");
+                return Optional.empty();
+            }
+            Integer clientId = Integer.valueOf(clientIdObj.toString());
+            log.debug("JWT validated successfully for clientId: {}", clientId);
+            return Optional.of(clientId);
+        } catch (InvalidJwtException | NumberFormatException e) {
+            log.warn("JWT validation failed or clientId invalid: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Extrae el userId (subject) del token JWT.
      *
      * @param jwt Token validado
