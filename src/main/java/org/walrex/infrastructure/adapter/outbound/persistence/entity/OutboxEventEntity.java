@@ -59,7 +59,7 @@ public class OutboxEventEntity {
     @Column(name = "processed_at")
     private Instant processedAt;
 
-    @Column(name = "last_error", length = 1000)
+    @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
 
     @Column(name = "retry_count", nullable = false)
