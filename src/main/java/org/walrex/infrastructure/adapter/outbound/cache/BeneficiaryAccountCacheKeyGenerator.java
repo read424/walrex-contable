@@ -23,8 +23,7 @@ public class BeneficiaryAccountCacheKeyGenerator {
                     pageRequest.getSortBy(),
                     pageRequest.getSortDirection().getValue(),
                     filter != null ? filter.getCustomerId() : null,
-                    filter != null ? filter.getAccountNumber() : null,
-                    filter != null ? filter.getIdNumber() : null
+                    filter != null ? filter.getAccountNumber() : null
             );
 
             String jsonRepresentation = objectMapper.writeValueAsString(components);
@@ -63,9 +62,6 @@ public class BeneficiaryAccountCacheKeyGenerator {
             if (filter.getAccountNumber() != null) {
                 key.append(":accountNumber:").append(filter.getAccountNumber());
             }
-            if (filter.getIdNumber() != null) {
-                key.append(":idNumber:").append(filter.getIdNumber());
-            }
         }
         return String.valueOf(key.toString().hashCode());
     }
@@ -76,7 +72,6 @@ public class BeneficiaryAccountCacheKeyGenerator {
             String sortBy,
             String sortDirection,
             Long customerId,
-            String accountNumber,
-            String idNumber
+            String accountNumber
     ) {}
 }
