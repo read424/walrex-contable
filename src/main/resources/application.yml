@@ -141,7 +141,7 @@ quarkus:
           temperature: 0.7
 
     # HuggingFace Provider Configuration
-    huggingface:
+    hugging-face:
       base-url: https://router.huggingface.co
       api-key: ${HUGGING_FACE_API_KEY:}
       timeout: 60s
@@ -199,18 +199,27 @@ quarkus:
       scope: jakarta.enterprise.context.ApplicationScoped
       read-timeout: 60000
       connect-timeout: 10000
+    twilio-api:
+      url: https://api.twilio.com
+      scope: jakarta.enterprise.context.ApplicationScoped
+      auth:
+        basic:
+          username: ${TWILIO_ACCOUNT_SID}
+          password: ${TWILIO_AUTH_TOKEN}
+      read-timeout: 10000
+      connect-timeout: 5000
+  qdrant:
+    dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
+    distance: Cosine
+    collection:
+      name: accounting_data
 
-    # Qdrant native client configuration (used by QdrantCollectionInitializer)
-    qdrant:
-      dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
-      distance: Cosine
-      collection:
-        name: accounting_data
+
+google:
+  cloud:
+    service-account-location: firebase-service-account.json
 
 
-    google:
-      cloud:
-        service-account-location: firebase-service-account.json
 azure:
   doc:
     intel:
@@ -247,6 +256,11 @@ app:
   login:
     max-attempts: 5
     lockout-minutes: 15
+  twilio:
+    account-sid: ${TWILIO_ACCOUNT_SID:ACxxx}
+    auth-token: ${TWILIO_AUTH_TOKEN:xxx}
+    from-number: ${TWILIO_FROM_NUMBER:+123456789}
+    whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+123456789}
 
 mp:
   jwt:
