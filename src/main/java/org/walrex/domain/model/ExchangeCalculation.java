@@ -1,6 +1,7 @@
 package org.walrex.domain.model;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Modelo de dominio que representa el resultado de un cálculo de cambio de divisas.
@@ -52,6 +53,21 @@ public record ExchangeCalculation(
         /**
          * Margen aplicado al cálculo (en porcentaje).
          */
-        BigDecimal marginApplied
+        BigDecimal marginApplied,
+
+        /**
+         * Listado de tasas de compra encontradas (Top 5).
+         */
+        List<ExchangeRate> advPriceBuy,
+
+        /**
+         * Listado de tasas de venta encontradas (Top 5).
+         */
+        List<ExchangeRate> advPriceSell,
+
+        /**
+         * Monto de USDT recibido en el primer tramo del cálculo.
+         */
+        BigDecimal usdtReceived
 ) {
 }

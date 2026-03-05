@@ -56,10 +56,11 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
             String baseCurrency,
             String quoteCountry,
             String quoteCurrency,
-            BigDecimal margin) {
+            BigDecimal margin,
+            String typeRate) {
 
-        log.info("Calculating exchange rate: {} {} -> {}, margin: {}%",
-                amount, baseCurrency, quoteCurrency, margin);
+        log.info("Calculating exchange rate: {} {} -> {}, margin: {}%, typeRate: {}",
+                amount, baseCurrency, quoteCurrency, margin, typeRate);
 
         return remittanceRoutePort.findAllActiveExchangeRateRoutes()
                 .map(routes -> routes.stream()
@@ -69,7 +70,7 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
                                 String.format("No active remittance route found for %s (%s) -> %s (%s)",
                                         baseCountry, baseCurrency, quoteCountry, quoteCurrency)))
                 )
-                .flatMap(route -> calculateCrossRate(amount, route, margin))
+                .flatMap(route -> calculateCrossRate(amount, route, margin, typeRate))
                 // Aplicar timeout proactivo de 25 segundos
                 .ifNoItem().after(CALCULATION_TIMEOUT).failWith(() -> {
                     log.error("Exchange rate calculation timed out after {} seconds for {} -> {}",
@@ -99,43 +100,63 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
     private Uni<ExchangeCalculation> calculateCrossRate(
             BigDecimal amount,
             ExchangeRateRouteInfo route,
-            BigDecimal margin) {
+            BigDecimal margin,
+            String typeRate) {
 
         log.info("Calculating cross rate for route: {}:{} -> {}:{}", 
                 route.getCountryFromCode(), route.getCurrencyFromCode(), 
                 route.getCountryToCode(), route.getCurrencyToCode());
 
-        // Consultar métodos de pago y tasas en paralelo
-        Uni<BigDecimal> buyPriceUni = fetchAveragePriceForPair(route, true);
-        Uni<BigDecimal> sellPriceUni = fetchAveragePriceForPair(route, false);
-
-        return Uni.combine().all().unis(buyPriceUni, sellPriceUni).asTuple()
-                .map(tuple -> {
-                    BigDecimal avgBuyPrice = tuple.getItem1();
-                    BigDecimal avgSellPrice = tuple.getItem2();
-
-                    // Calcular USDT recibido
+        // 1. Buscar tasa de compra según monto fiat
+        return fetchRatesForPair(route, true, amount)
+                .flatMap(buyRates -> {
+                    // Calcular precio de compra (promedio, min o max de los top 5)
+                    BigDecimal avgBuyPrice = calculateRateByStrategy(buyRates, true, typeRate);
+                    
+                    // 2. Calcular USDT recibido
                     BigDecimal usdtReceived = calculateUsdtReceived(amount, avgBuyPrice);
+                    
+                    log.info("BUY Step: price={}, usdtReceived={}", avgBuyPrice, usdtReceived);
 
-                    return buildExchangeCalculation(
-                            amount,
-                            route.getCurrencyFromCode(),
-                            route.getCurrencyToCode(),
-                            avgBuyPrice,
-                            avgSellPrice,
-                            usdtReceived,
-                            margin
-                    );
+                    // 3. Buscar tasa de venta según USDT recibido
+                    return fetchRatesForPair(route, false, usdtReceived)
+                            .map(sellRates -> {
+                                BigDecimal avgSellPrice = calculateRateByStrategy(sellRates, false, typeRate);
+                                
+                                log.info("SELL Step: price={}", avgSellPrice);
+
+                                return buildExchangeCalculation(
+                                        amount,
+                                        route.getCurrencyFromCode(),
+                                        route.getCurrencyToCode(),
+                                        avgBuyPrice,
+                                        avgSellPrice,
+                                        usdtReceived,
+                                        margin,
+                                        buyRates.stream().limit(TOP_PRICES_LIMIT).toList(),
+                                        sellRates.stream().limit(TOP_PRICES_LIMIT).toList()
+                                );
+                            });
                 });
     }
 
     /**
-     * Obtiene el precio promedio (Top 5) para compra o venta.
+     * Obtiene el listado de tasas para un par y tipo de operación.
      */
-    private Uni<BigDecimal> fetchAveragePriceForPair(ExchangeRateRouteInfo route, boolean isBuy) {
+    private Uni<List<ExchangeRate>> fetchRatesForPair(ExchangeRateRouteInfo route, boolean isBuy, BigDecimal amount) {
         Long countryCurrencyId = isBuy ? route.getCountryCurrencyFromId() : route.getCountryCurrencyToId();
         String currency = isBuy ? route.getCurrencyFromCode() : route.getCurrencyToCode();
         String tradeType = isBuy ? TRADE_TYPE_BUY : TRADE_TYPE_SELL;
+
+        BigDecimal cryptoAmount = null;
+        if (!isBuy) {
+            cryptoAmount = amount;
+            amount = null;
+        }
+
+        // Variables effectively final para captura en la lambda
+        final BigDecimal finalFiatAmount = amount;
+        final BigDecimal finalCryptoAmount = cryptoAmount;
 
         return paymentMethodPort.findBinancePaymentCodesByCountryCurrency(countryCurrencyId)
                 .flatMap(payTypes -> exchangeRateProvider.fetchExchangeRates(
@@ -143,15 +164,15 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
                         currency,
                         tradeType,
                         payTypes,
-                        null
-                ))
-                .map(rates -> calculateTop5Average(rates, isBuy));
+                        finalFiatAmount,
+                        finalCryptoAmount
+                ));
     }
 
     /**
-     * Calcula el promedio de las 5 mejores tasas.
+     * Calcula la tasa según la estrategia solicitada (MIN, MAX, PROMEDIO) sobre el Top 5.
      */
-    private BigDecimal calculateTop5Average(List<ExchangeRate> rates, boolean isBuy) {
+    private BigDecimal calculateRateByStrategy(List<ExchangeRate> rates, boolean isBuy, String typeRate) {
         if (rates == null || rates.isEmpty()) {
             throw new IllegalStateException("No exchange rates available for " + (isBuy ? "BUY" : "SELL"));
         }
@@ -164,8 +185,14 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
                 .map(ExchangeRate::price)
                 .toList();
 
-        BigDecimal sum = topPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return sum.divide(BigDecimal.valueOf(topPrices.size()), SCALE, RoundingMode.HALF_UP);
+        return switch (typeRate.toUpperCase()) {
+            case "MIN" -> topPrices.stream().min(BigDecimal::compareTo).orElseThrow();
+            case "MAX" -> topPrices.stream().max(BigDecimal::compareTo).orElseThrow();
+            default -> { // PROMEDIO
+                BigDecimal sum = topPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+                yield sum.divide(BigDecimal.valueOf(topPrices.size()), SCALE, RoundingMode.HALF_UP);
+            }
+        };
     }
 
     /**
@@ -185,7 +212,9 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
             BigDecimal avgBuyPrice,
             BigDecimal avgSellPrice,
             BigDecimal usdtReceived,
-            BigDecimal margin) {
+            BigDecimal margin,
+            List<ExchangeRate> advPriceBuy,
+            List<ExchangeRate> advPriceSell) {
 
         // Tasa cruzada sin margen
         BigDecimal rate = avgSellPrice.divide(avgBuyPrice, SCALE, RoundingMode.HALF_UP);
@@ -209,7 +238,10 @@ public class ExchangeRateCalculationService implements CalculateExchangeRateUseC
                 rate,
                 exchangeRate,
                 convertedAmount,
-                margin
+                margin,
+                advPriceBuy,
+                advPriceSell,
+                usdtReceived
         );
     }
 }
