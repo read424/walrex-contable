@@ -91,16 +91,22 @@ class ExchangeRateCalculationServiceTest {
                 .thenReturn(Uni.createFrom().item(penPaymentMethods));
         when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(2L))
                 .thenReturn(Uni.createFrom().item(vesPaymentMethods));
+        
+        // Mock buy rates (BUY USDT/PEN with amount)
         when(exchangeRateProvider.fetchExchangeRates(
-                eq("USDT"), eq("PEN"), eq("BUY"), eq(penPaymentMethods), isNull()))
+                eq("USDT"), eq("PEN"), eq("BUY"), eq(penPaymentMethods), eq(amount), isNull()))
                 .thenReturn(Uni.createFrom().item(buyRates));
+        
+        // Mock sell rates (SELL USDT/VES with usdtReceived = 100/3.80 = 26.31578947)
+        // Note: The service calculates it with SCALE=8
+        BigDecimal expectedUsdtReceived = amount.divide(new BigDecimal("3.80"), 8, java.math.RoundingMode.HALF_UP);
         when(exchangeRateProvider.fetchExchangeRates(
-                eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull()))
+                eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull(), eq(expectedUsdtReceived)))
                 .thenReturn(Uni.createFrom().item(sellRates));
 
         // Act
         ExchangeCalculation result = service
-                .calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
+                .calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin, "PROMEDIO")
                 .await()
                 .indefinitely();
 
@@ -125,6 +131,14 @@ class ExchangeRateCalculationServiceTest {
 
         // La tasa con margen debe ser menor que la tasa sin margen (dividimos para aplicar margen)
         assertTrue(result.exchangeRate().compareTo(result.rate()) < 0);
+
+        // Verificar nuevos campos
+        assertNotNull(result.advPriceBuy());
+        assertNotNull(result.advPriceSell());
+        assertNotNull(result.usdtReceived());
+        assertEquals(5, result.advPriceBuy().size());
+        assertEquals(5, result.advPriceSell().size());
+        assertEquals(0, result.usdtReceived().compareTo(expectedUsdtReceived));
     }
 
     @Test
@@ -142,7 +156,7 @@ class ExchangeRateCalculationServiceTest {
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
+                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin, "PROMEDIO")
                         .await()
                         .indefinitely()
         );
@@ -175,17 +189,115 @@ class ExchangeRateCalculationServiceTest {
                         .build())));
         when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(anyLong()))
                 .thenReturn(Uni.createFrom().item(List.of("Yape")));
-        when(exchangeRateProvider.fetchExchangeRates(any(), any(), any(), any(), any()))
+        when(exchangeRateProvider.fetchExchangeRates(any(), any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(Collections.emptyList()));
 
         // Act & Assert
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin)
+                service.calculateExchangeRate(amount, baseCountry, baseCurrency, quoteCountry, quoteCurrency, margin, "PROMEDIO")
                         .await()
                         .indefinitely()
         );
 
         assertTrue(exception.getMessage().contains("No exchange rates available"));
+    }
+
+    @Test
+    void shouldCalculateExchangeRateWithTypeRateMin() {
+        // Arrange
+        BigDecimal amount = BigDecimal.valueOf(100.00);
+        BigDecimal margin = BigDecimal.valueOf(5.0);
+
+        ExchangeRateRouteInfo route = ExchangeRateRouteInfo.builder()
+                .countryCurrencyFromId(1L).currencyFromId(1)
+                .countryFromCode("PE").currencyFromCode("PEN")
+                .countryCurrencyToId(2L).currencyToId(2)
+                .countryToCode("VE").currencyToCode("VES")
+                .intermediaryAsset("USDT").build();
+
+        List<String> penPaymentMethods = List.of("Yape");
+        List<String> vesPaymentMethods = List.of("PagoMovil");
+
+        List<ExchangeRate> buyRates = List.of(
+                createMockRate("3.78"), createMockRate("3.79"), createMockRate("3.80"),
+                createMockRate("3.81"), createMockRate("3.82")
+        );
+        List<ExchangeRate> sellRates = List.of(
+                createMockRate("36.50"), createMockRate("36.45"), createMockRate("36.55"),
+                createMockRate("36.48"), createMockRate("36.52")
+        );
+
+        // Con typeRate=MIN en compra, el precio resultante es el mínimo del top5 ordenado asc = 3.78
+        BigDecimal expectedBuyPrice = new BigDecimal("3.78");
+        BigDecimal expectedUsdtReceived = amount.divide(expectedBuyPrice, 8, java.math.RoundingMode.HALF_UP);
+
+        when(remittanceRoutePort.findAllActiveExchangeRateRoutes()).thenReturn(Uni.createFrom().item(List.of(route)));
+        when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(1L)).thenReturn(Uni.createFrom().item(penPaymentMethods));
+        when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(2L)).thenReturn(Uni.createFrom().item(vesPaymentMethods));
+        when(exchangeRateProvider.fetchExchangeRates(eq("USDT"), eq("PEN"), eq("BUY"), eq(penPaymentMethods), eq(amount), isNull()))
+                .thenReturn(Uni.createFrom().item(buyRates));
+        when(exchangeRateProvider.fetchExchangeRates(eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull(), eq(expectedUsdtReceived)))
+                .thenReturn(Uni.createFrom().item(sellRates));
+
+        // Act
+        ExchangeCalculation result = service
+                .calculateExchangeRate(amount, "PE", "PEN", "VE", "VES", margin, "MIN")
+                .await().indefinitely();
+
+        // Assert: el averageBuyPrice debe ser el mínimo = 3.78
+        assertEquals(0, result.averageBuyPrice().compareTo(new BigDecimal("3.78")));
+        assertNotNull(result.advPriceBuy());
+        assertNotNull(result.advPriceSell());
+        assertEquals(0, result.usdtReceived().compareTo(expectedUsdtReceived));
+    }
+
+    @Test
+    void shouldCalculateExchangeRateWithTypeRateMax() {
+        // Arrange
+        BigDecimal amount = BigDecimal.valueOf(100.00);
+        BigDecimal margin = BigDecimal.valueOf(5.0);
+
+        ExchangeRateRouteInfo route = ExchangeRateRouteInfo.builder()
+                .countryCurrencyFromId(1L).currencyFromId(1)
+                .countryFromCode("PE").currencyFromCode("PEN")
+                .countryCurrencyToId(2L).currencyToId(2)
+                .countryToCode("VE").currencyToCode("VES")
+                .intermediaryAsset("USDT").build();
+
+        List<String> penPaymentMethods = List.of("Yape");
+        List<String> vesPaymentMethods = List.of("PagoMovil");
+
+        List<ExchangeRate> buyRates = List.of(
+                createMockRate("3.78"), createMockRate("3.79"), createMockRate("3.80"),
+                createMockRate("3.81"), createMockRate("3.82")
+        );
+        List<ExchangeRate> sellRates = List.of(
+                createMockRate("36.50"), createMockRate("36.45"), createMockRate("36.55"),
+                createMockRate("36.48"), createMockRate("36.52")
+        );
+
+        // Con typeRate=MAX en compra, el precio resultante es el máximo del top5 ordenado asc = 3.82
+        BigDecimal expectedBuyPrice = new BigDecimal("3.82");
+        BigDecimal expectedUsdtReceived = amount.divide(expectedBuyPrice, 8, java.math.RoundingMode.HALF_UP);
+
+        when(remittanceRoutePort.findAllActiveExchangeRateRoutes()).thenReturn(Uni.createFrom().item(List.of(route)));
+        when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(1L)).thenReturn(Uni.createFrom().item(penPaymentMethods));
+        when(paymentMethodPort.findBinancePaymentCodesByCountryCurrency(2L)).thenReturn(Uni.createFrom().item(vesPaymentMethods));
+        when(exchangeRateProvider.fetchExchangeRates(eq("USDT"), eq("PEN"), eq("BUY"), eq(penPaymentMethods), eq(amount), isNull()))
+                .thenReturn(Uni.createFrom().item(buyRates));
+        when(exchangeRateProvider.fetchExchangeRates(eq("USDT"), eq("VES"), eq("SELL"), eq(vesPaymentMethods), isNull(), eq(expectedUsdtReceived)))
+                .thenReturn(Uni.createFrom().item(sellRates));
+
+        // Act
+        ExchangeCalculation result = service
+                .calculateExchangeRate(amount, "PE", "PEN", "VE", "VES", margin, "MAX")
+                .await().indefinitely();
+
+        // Assert: el averageBuyPrice debe ser el máximo = 3.82
+        assertEquals(0, result.averageBuyPrice().compareTo(new BigDecimal("3.82")));
+        assertNotNull(result.advPriceBuy());
+        assertNotNull(result.advPriceSell());
+        assertEquals(0, result.usdtReceived().compareTo(expectedUsdtReceived));
     }
 
     /**
