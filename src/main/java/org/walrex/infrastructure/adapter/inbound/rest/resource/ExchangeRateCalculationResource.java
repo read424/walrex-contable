@@ -93,7 +93,8 @@ public class ExchangeRateCalculationResource {
                         request.baseCurrency(),
                         request.quoteCodeCountry(),
                         request.quoteCurrency(),
-                        request.margin()
+                        request.margin(),
+                        request.typeRate()
                 )
                 .map(exchangeRateMapper::toResponse)
                 .map(response -> Response.ok(response).build())
