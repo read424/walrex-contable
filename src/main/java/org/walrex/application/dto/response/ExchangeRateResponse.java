@@ -1,6 +1,8 @@
 package org.walrex.application.dto.response;
 
+import org.walrex.domain.model.ExchangeRate;
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * DTO de respuesta para cálculo de cambio de divisas.
@@ -54,6 +56,21 @@ public record ExchangeRateResponse(
         /**
          * Margen aplicado al cálculo (en porcentaje).
          */
-        BigDecimal marginApplied
+        BigDecimal marginApplied,
+
+        /**
+         * Listado de tasas de compra encontradas (Top 5).
+         */
+        List<ExchangeRate> advPriceBuy,
+
+        /**
+         * Listado de tasas de venta encontradas (Top 5).
+         */
+        List<ExchangeRate> advPriceSell,
+
+        /**
+         * Monto de USDT recibido en el primer tramo del cálculo.
+         */
+        BigDecimal usdtReceived
 ) {
 }
