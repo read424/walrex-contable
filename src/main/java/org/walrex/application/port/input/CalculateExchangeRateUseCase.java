@@ -12,6 +12,7 @@ public interface CalculateExchangeRateUseCase {
             String baseCurrency,
             String quoteCountry,
             String quoteCurrency,
-            BigDecimal margin
+            BigDecimal margin,
+            String typeRate
     );
 }
