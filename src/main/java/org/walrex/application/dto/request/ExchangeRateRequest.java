@@ -76,7 +76,17 @@ public record ExchangeRateRequest(
      * Si no se especifica, se usa 5.0 por defecto.
      */
     @DecimalMin(value = "0.0", message = "Margin must be 0 or greater")
-    BigDecimal margin
+    BigDecimal margin,
+
+    /**
+     * Tipo de cálculo para la tasa (MIN, MAX, PROMEDIO).
+     * Si no se especifica, se usa PROMEDIO por defecto.
+     */
+    @Pattern(
+            regexp = "^(MIN|MAX|PROMEDIO)$",
+            message = "Rate type must be MIN, MAX or PROMEDIO"
+    )
+    String typeRate
 ) {
     /**
      * Constructor que normaliza los datos.
@@ -91,6 +101,12 @@ public record ExchangeRateRequest(
         // Margen por defecto: 5%
         if (margin == null) {
             margin = BigDecimal.valueOf(5.0);
+        }
+        // Tipo de tasa por defecto: PROMEDIO
+        if (typeRate == null || typeRate.isBlank()) {
+            typeRate = "PROMEDIO";
+        } else {
+            typeRate = typeRate.toUpperCase().trim();
         }
     }
 }
