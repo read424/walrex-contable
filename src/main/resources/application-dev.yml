@@ -52,4 +52,17 @@ quarkus:
       url: jdbc:postgresql://127.0.0.1:5432/walrex_db
       min-size: 1
       max-size: 4
+  # ---------------------------------------------------------------------------
+  # Vault — modo desarrollo
+  # Levanta un servidor local: vault server -dev -dev-root-token-id=dev-root-token
+  # Luego carga secrets con: docs/vault/seed-dev-secrets.sh
+  # ---------------------------------------------------------------------------
+  vault:
+    url: http://127.0.0.1:8200
+    authentication:
+      client-token: ${VAULT_DEV_TOKEN:dev-root-token}
+    log-confidentiality-level: LOW
+    devservices:
+      enabled: false
+
   smallrye-fault-tolerance:

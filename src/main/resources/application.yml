@@ -15,32 +15,75 @@ quarkus:
     enabled: false
   test:
     integration-test-profile: test
+
+  # ---------------------------------------------------------------------------
+  # HashiCorp Vault — gestión centralizada de secrets
+  # Instancia dedicada en Oracle Cloud (VM separada de la app)
+  #
+  # Estructura KV v2 esperada (mount: secret/):
+  #   walrex/infra/database  → db-username, db-password, db-host, db-name
+  #   walrex/infra/redis     → redis-host  (sin password en red privada)
+  #   walrex/app/jwt         → jwt-secret, registration-token-secret
+  #   walrex/app/email       → email-password
+  #   walrex/app/twilio      → twilio-account-sid, twilio-auth-token,
+  #                            twilio-from-number, twilio-whatsapp-from
+  #   walrex/app/apis        → openai-api-key, groq-api-key,
+  #                            hugging-face-api-key, finnhub-api-token,
+  #                            azure-doc-intel-key, qdrant-api-key
+  #   walrex/app/fcm         → fcm-credentials-path
+  # ---------------------------------------------------------------------------
+  vault:
+    url: ${VAULT_URL:http://127.0.0.1:8200}
+    authentication:
+      app-role:
+        role-id: ${VAULT_ROLE_ID}
+        secret-id: ${VAULT_SECRET_ID}
+    kv-secret-engine-mount-path: secret
+    kv-secret-engine-version: 2
+    secret-config-kv-path:
+      - walrex/infra/database
+      - walrex/infra/redis
+      - walrex/app/jwt
+      - walrex/app/email
+      - walrex/app/twilio
+      - walrex/app/apis
+      - walrex/app/fcm
+    # MEDIUM oculta valores en logs; usar LOW solo en dev local
+    log-confidentiality-level: MEDIUM
+    devservices:
+      enabled: false
+
   flyway:
     migrate-at-start: true
     locations: db/migration
     baseline-on-migrate: true
-    baseline-version: "10"
+    baseline-version: "0"
     repair-at-start: true
+
   datasource:
     devservices:
       enabled: false
     db-kind: postgresql
-    username: postgres
-    password: 12345
+    # Claves inyectadas desde walrex/infra/database
+    username: ${db-username}
+    password: ${db-password}
     jdbc:
-      url: jdbc:postgresql://127.0.0.1:5432/walrex_db
-      min-size: 1
-      max-size: 4
+      url: jdbc:postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
+      min-size: 2
+      max-size: 8
     reactive:
-      url: postgresql://127.0.0.1:5432/walrex_db
+      url: postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
       max-size: 20
+
   swagger-ui:
-    always-include: true
+    always-include: false
     path: /swagger-ui
+
   redis:
     devservices:
       enabled: false
-    hosts: redis://127.0.0.1:6379
+    # Clave inyectada desde walrex/infra/redis
+    hosts: redis://${redis-host:127.0.0.1}:6379
     timeout: 10s
     max-pool-size: 20
     max-pool-waiting: 24
@@ -48,6 +91,7 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
+
   otel:
     enabled: true
     sdk:
@@ -59,7 +103,7 @@ quarkus:
         arg: 1.0
     exporter:
       otlp:
-        endpoint: http://localhost:4317
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
     propagators:
       - tracecontext
       - baggage
@@ -67,7 +111,8 @@ quarkus:
       attributes:
         service.name: admon-catalogo
         service.version: 1.0.0-SNAPSHOT
-        deployment.environment: dev
+        deployment.environment: ${DEPLOYMENT_ENV:dev}
+
   micrometer:
     enabled: true
     registry-enabled-default: false
@@ -87,36 +132,36 @@ quarkus:
         enabled: true
       mp-metrics:
         enabled: true
+
   mailer:
     from: developer@texlamerced.com
     host: mail.texlamerced.com
     port: 465
     ssl: true
     username: developer@texlamerced.com
-    password: ${PASSWORD_EMAIL_DEV:p4s52024}
+    # Clave inyectada desde walrex/app/email
+    password: ${email-password}
+
   log:
     level: INFO
     min-level: TRACE
     category:
       "io.quarkus.security":
-        level: DEBUG
+        level: INFO
       "io.smallrye.jwt":
-        level: DEBUG
+        level: INFO
       "io.quarkus.smallrye.jwt":
-        level: DEBUG
+        level: INFO
+
   smallrye-fault-tolerance:
 
   langchain4j:
     devservices:
       enabled: false
-
-    # Define default providers to resolve ambiguity for any unqualified injections
     chat-model:
       provider: openai
     embedding-model:
       provider: openai
-
-    # Named model provider assignments
     groq-chat:
       chat-model:
         provider: openai
@@ -127,21 +172,18 @@ quarkus:
       embedding-model:
         provider: ollama
 
-    # --- Provider-Centric Configurations ---
-
-    # OpenAI Provider Configuration
     openai:
-      # Default OpenAI configuration for embeddings
-      api-key: ${OPENAI_API_KEY:changeme}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${openai-api-key}
       timeout: 60s
       log-requests: false
       log-responses: false
       embedding-model:
         model-name: text-embedding-3-small
         dimensions: 1536
-      # Named model for Groq chat using OpenAI-compatible API
       groq-chat:
-        api-key: ${GROQ_API_KEY:changeme}
+        # Clave inyectada desde walrex/app/apis
+        api-key: ${groq-api-key}
         base-url: https://api.groq.com/openai/v1
         timeout: 60s
         log-requests: false
@@ -150,10 +192,10 @@ quarkus:
           model-name: llama-3.1-8b-instant
           temperature: 0.7
 
-    # HuggingFace Provider Configuration
     hugging-face:
       base-url: https://router.huggingface.co
-      api-key: ${HUGGING_FACE_API_KEY:}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${hugging-face-api-key:}
       timeout: 60s
       log-requests: false
       log-responses: false
@@ -161,11 +203,9 @@ quarkus:
         model-id: "sentence-transformers/all-MiniLM-L6-v2"
         timeout: 60s
 
-    # Ollama Provider Configuration
     ollama:
       base-url: http://localhost:11434
       timeout: 60s
-      # Named model for Ollama chat, to be injected with @ModelName("ollama-chat")
       ollama-chat:
         base-url: http://localhost:11434
         timeout: 60s
@@ -174,18 +214,17 @@ quarkus:
         chat-model:
           model-id: llama3.2
           temperature: 0.7
-      # Named model for Ollama embeddings, to be injected with @ModelName("ollama-embed")
       ollama-embed:
         base-url: http://localhost:11434
         timeout: 60s
         embedding-model:
           model-id: mxbai-embed-large
 
-    # Qdrant configuration
     qdrant:
       host: localhost
       port: 6334
-      api-key: ${QDRANT_API_KEY:}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${qdrant-api-key:}
       use-tls: false
       collection:
         name: accounting_data
@@ -224,12 +263,14 @@ quarkus:
       scope: jakarta.enterprise.context.ApplicationScoped
       auth:
         basic:
-          username: ${TWILIO_ACCOUNT_SID}
-          password: ${TWILIO_AUTH_TOKEN}
+          # Claves inyectadas desde walrex/app/twilio
+          username: ${twilio-account-sid}
+          password: ${twilio-auth-token}
       read-timeout: 10000
       connect-timeout: 5000
+
   qdrant:
-    dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
+    dimension: 1536
     distance: Cosine
     collection:
       name: accounting_data
@@ -237,12 +278,15 @@ quarkus:
 
 google:
   cloud:
-    service-account-location: firebase-service-account.json
+    # Ruta al archivo en el servidor (fuera del classpath); la ruta
+    # se almacena en Vault (walrex/app/fcm → fcm-credentials-path)
+    service-account-location: ${fcm-credentials-path:/etc/walrex/firebase-service-account.json}
 
 azure:
   doc:
     intel:
-      key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
+      # Clave inyectada desde walrex/app/apis
+      key: ${azure-doc-intel-key}
 
 embeddings:
   sync:
@@ -270,26 +314,30 @@ rag:
 app:
   registration:
     token:
-      secret: ${REGISTRATION_TOKEN_SECRET}
+      # Clave inyectada desde walrex/app/jwt
+      secret: ${registration-token-secret}
       expiration-minutes: 10
   login:
     max-attempts: 5
     lockout-minutes: 15
   twilio:
-    account-sid: ${TWILIO_ACCOUNT_SID:ACxxx}
-    auth-token: ${TWILIO_AUTH_TOKEN:xxx}
-    from-number: ${TWILIO_FROM_NUMBER:+123456789}
-    whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+123456789}
+    # Claves inyectadas desde walrex/app/twilio
+    account-sid: ${twilio-account-sid}
+    auth-token: ${twilio-auth-token}
+    from-number: ${twilio-from-number}
+    whatsapp-from: ${twilio-whatsapp-from}
 
 mp:
   jwt:
     verify:
       issuer: https://walrex.org/issuer
-    secret: ${JWT_SECRET}
+    # Clave inyectada desde walrex/app/jwt
+    secret: ${jwt-secret}
 
 fcm:
   enabled: true
-  credentials-file: firebase-service-account.json
+  # Ruta inyectada desde walrex/app/fcm
+  credentials-file: ${fcm-credentials-path:/etc/walrex/firebase-service-account.json}
 
 screening:
   threshold:
@@ -297,39 +345,28 @@ screening:
     review: ${SCREENING_THRESHOLD_REVIEW:4.0}
 
 astropay:
-  # Porcentaje de ganancia que se descuenta a la tasa recibida: rate / (1 + margin-percent/100)
-  # Ejemplo: margin-percent=6 → divisor=1.06 → rate/1.06
   margin-percent: ${ASTROPAY_MARGIN_PERCENT:6}
 
 finnhub:
-  api-token: ${FINNHUB_API_TOKEN:d80du0pr01qq9ln3ha1gd80du0pr01qq9ln3ha20}
-  # Proveedor de símbolos: OANDA | FXCM
+  # Clave inyectada desde walrex/app/apis
+  api-token: ${finnhub-api-token}
   symbol-provider: ${FINNHUB_SYMBOL_PROVIDER:OANDA}
-  # Delay en ms antes de cada reintento de reconexión
   reconnect-delay-ms: ${FINNHUB_RECONNECT_DELAY_MS:5000}
-  # Variación porcentual mínima para disparar consulta a AstroPay
   price-change-threshold: ${FINNHUB_PRICE_CHANGE_THRESHOLD:2.5}
 
 binance:
   spot:
     stream:
-      # Par a monitorear como sensor de volatilidad (btcusdt | penusdt | ethusdt)
       symbol: ${BINANCE_SPOT_SYMBOL:btcusdt}
-      # Variación % que dispara el fetch Binance P2P
       price-change-threshold: ${BINANCE_SPOT_THRESHOLD:1.5}
-      # Minutos de cooldown entre triggers (evita ráfagas)
       cooldown-minutes: ${BINANCE_SPOT_COOLDOWN_MINUTES:5}
-      # Delay en ms antes de cada reintento de reconexión
       reconnect-delay-ms: ${BINANCE_SPOT_RECONNECT_DELAY_MS:5000}
 
 walrex:
   scheduler:
     exchange-rate:
-      # "off" = deshabilitado (reemplazado por FinnhubStreamManager)
-      # Para re-activar: cron=0 */10 * * * ?  initial.every=10s
       cron: "off"
       initial:
         every: "off"
     market-sync:
-      # Reconciliación BD vs. suscripciones en memoria
       every: ${MARKET_SYNC_EVERY:24h}
