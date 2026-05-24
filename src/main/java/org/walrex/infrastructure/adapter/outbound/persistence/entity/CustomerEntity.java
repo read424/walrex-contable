@@ -1,5 +1,6 @@
 package org.walrex.infrastructure.adapter.outbound.persistence.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -99,4 +100,45 @@ public class CustomerEntity extends PanacheEntityBase {
     @Builder.Default
     @Column(name = "kyc_level", nullable = false)
     public Integer kycLevel = 0;
+
+    // Screening
+    @Builder.Default
+    @Column(name = "screening_decision")
+    private String screeningDecision = "PENDING";
+
+    @Builder.Default
+    @Column(name = "screening_score")
+    private BigDecimal screeningScore = BigDecimal.ZERO;
+
+    @Column(name = "screening_datasets")
+    private String screeningDatasets;
+
+    @Column(name = "screening_entity_id")
+    private String screeningEntityId;
+
+    @Column(name = "screening_last_checked")
+    private OffsetDateTime screeningLastChecked;
+
+    // KYC extendido
+    @Column(name = "kyc_reviewed_by")
+    private Integer kycReviewedBy;
+
+    @Column(name = "kyc_reviewed_at")
+    private OffsetDateTime kycReviewedAt;
+
+    @Column(name = "kyc_approved_at")
+    private OffsetDateTime kycApprovedAt;
+
+    @Column(name = "kyc_expires_at")
+    private LocalDate kycExpiresAt;
+
+    @Column(name = "kyc_notes")
+    private String kycNotes;
+
+    // Nacionalidad / país de nacimiento
+    @Column(name = "nationality")
+    private String nationality;
+
+    @Column(name = "id_country_birth")
+    private Integer idCountryBirth;
 }

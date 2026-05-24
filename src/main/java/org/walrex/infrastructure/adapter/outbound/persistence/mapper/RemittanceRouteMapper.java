@@ -34,6 +34,7 @@ public interface RemittanceRouteMapper {
     @Mapping(source = "countryCurrencyTo.currency.id", target = "currencyToId")
     @Mapping(source = "countryCurrencyTo.currency.alphabeticCode", target = "currencyToCode")
     @Mapping(source = "intermediaryAsset", target = "intermediaryAsset")
+    @Mapping(source = "rateProvider", target = "rateProvider")
     RemittanceRoute toDomain(RemittanceRouteEntity entity);
 
     /**
@@ -61,6 +62,7 @@ public interface RemittanceRouteMapper {
     @Mapping(source = "countryCurrencyTo.country.id", target = "countryToId")
     @Mapping(source = "countryCurrencyTo.country.alphabeticCode2", target = "countryToCode")
     @Mapping(source = "intermediaryAsset", target = "intermediaryAsset")
+    @Mapping(source = "rateProvider", target = "rateProvider")
     ExchangeRateRouteInfo toExchangeRateRouteInfo(RemittanceRouteEntity entity);
 
     /**

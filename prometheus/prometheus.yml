@@ -76,3 +76,32 @@ scrape_configs:
         labels:
           service: 'prometheus'
           component: 'monitoring'
+
+  # ==========================================
+  # WALREX CHAT API (NestJS + Socket.io)
+  # OpenTelemetry PrometheusExporter en :9464
+  # ==========================================
+  - job_name: 'walrex-chat-api'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['192.168.100.182:9464']
+        labels:
+          service: 'walrex-chat-api'
+          component: 'backend'
+          technology: 'nestjs'
+    # Métricas custom expuestas:
+    # - walrex_ws_connections_total          (total conexiones WS por namespace)
+    # - walrex_ws_active_connections         (conexiones vivas en este momento)
+    # - walrex_ws_events_received_total      (eventos incoming por event+namespace)
+    # - walrex_ws_events_emitted_total       (eventos outgoing por event+namespace)
+    # - walrex_ws_event_duration_ms          (latencia p50/p90/p99 de handlers)
+    # - walrex_ws_payload_size_bytes         (tamaño de payloads JSON)
+    # - walrex_ws_event_errors_total         (errores por evento)
+    # - walrex_webchat_active_agents         (agentes conectados en /webchat)
+    # - walrex_whatsapp_active_sessions      (sesiones WhatsApp en estado ready)
+    # - walrex_whatsapp_qr_generated_total   (QR generados)
+    # - walrex_chat_messages_total           (mensajes por direction+channel)
+    # Más las métricas automáticas de OTel:
+    # - http_server_duration_*               (latencia HTTP por ruta)
+    # - db_client_operation_duration_*       (queries TypeORM/pg)

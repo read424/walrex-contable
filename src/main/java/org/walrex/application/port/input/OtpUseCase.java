@@ -9,5 +9,7 @@ import org.walrex.application.dto.response.OtpValidationResponse;
 public interface OtpUseCase {
     Uni<OtpResponse> generateOtp(OtpGenerateRequest request);
 
+    Uni<OtpResponse> resendOtp(OtpGenerateRequest request);
+
     Uni<OtpValidationResponse> validateOtp(OtpValidateRequest request);
 }

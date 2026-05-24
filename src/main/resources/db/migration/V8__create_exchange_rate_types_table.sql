@@ -10,13 +10,22 @@ CREATE TABLE IF NOT EXISTS exchange_rate_types (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insertar tipos de tasa iniciales
-INSERT INTO exchange_rate_types (code, name, description, display_order) VALUES
-('BCV', 'BCV', 'Banco Central de Venezuela', 1),
-('PARALELO', 'Paralelo', 'Tasa paralela del mercado', 2),
-('MARKET', 'Mercado', 'Tasa de mercado general', 3),
-('EURO', 'Euro', 'Tasa basada en Euro', 4)
-ON CONFLICT (code) DO NOTHING;
+-- Insertar tipos de tasa iniciales solo si la tabla usa el esquema V8 (columna "code").
+-- Si el esquema V9 (country_id, code_rate) ya existe, el INSERT se omite.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'exchange_rate_types' AND column_name = 'code'
+    ) THEN
+        INSERT INTO exchange_rate_types (code, name, description, display_order) VALUES
+        ('BCV',      'BCV',      'Banco Central de Venezuela',   1),
+        ('PARALELO', 'Paralelo', 'Tasa paralela del mercado',    2),
+        ('MARKET',   'Mercado',  'Tasa de mercado general',      3),
+        ('EURO',     'Euro',     'Tasa basada en Euro',          4)
+        ON CONFLICT (code) DO NOTHING;
+    END IF;
+END $$;
 
 -- Agregar columna exchange_rate_type_id a price_exchange si no existe
 DO $$ 

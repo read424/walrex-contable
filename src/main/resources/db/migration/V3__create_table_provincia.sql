@@ -1,4 +1,4 @@
-CREATE TABLE province (
+CREATE TABLE IF NOT EXISTS province (
     id_province SERIAL PRIMARY KEY,
     cod_province CHAR(4) NOT NULL,
     name_province VARCHAR(100) NOT NULL,

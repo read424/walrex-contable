@@ -11,12 +11,11 @@ import org.walrex.application.dto.response.OtpResponse;
 import org.walrex.application.dto.response.OtpValidationResponse;
 import org.walrex.application.port.input.OtpUseCase;
 import org.walrex.application.port.output.OtpRepositoryPort;
-import org.walrex.application.port.output.OutboxRepositoryPort;
 import org.walrex.application.port.output.RegistrationTokenPort;
 import org.walrex.domain.exception.InvalidOtpException;
 import org.walrex.domain.factory.OtpFactory;
-import org.walrex.domain.factory.OutboxEventFactory;
 import org.walrex.domain.model.Otp;
+import org.walrex.infrastructure.adapter.outbound.notification.AsyncOtpDeliveryService;
 
 @Slf4j
 @ApplicationScoped
@@ -26,9 +25,6 @@ public class OtpDomainService implements OtpUseCase {
     OtpRepositoryPort otpRepositoryPort;
 
     @Inject
-    OutboxRepositoryPort outboxRepositoryPort;
-
-    @Inject
     RegistrationTokenPort registrationTokenPort;
 
     @Inject
@@ -36,6 +32,9 @@ public class OtpDomainService implements OtpUseCase {
 
     @Inject
     OtpHasher otpHasher;
+
+    @Inject
+    AsyncOtpDeliveryService asyncOtpDeliveryService;
 
 
     @Override
@@ -60,6 +59,25 @@ public class OtpDomainService implements OtpUseCase {
                 });
     }
 
+    @Override
+    @WithTransaction
+    public Uni<OtpResponse> resendOtp(OtpGenerateRequest request) {
+        log.debug("Resending OTP for request: {}", request);
+        return otpRepositoryPort.findActiveByTargetAndPurpose(
+                        request.getTarget(),
+                        request.getPurpose()
+                )
+                .flatMap(existingOtp -> {
+                    if (existingOtp == null) {
+                        return createNewOtp(request);
+                    }
+
+                    existingOtp.markAsUsed();
+                    return otpRepositoryPort.update(existingOtp)
+                            .replaceWith(createNewOtp(request));
+                });
+    }
+
     private Uni<OtpResponse> createNewOtp(OtpGenerateRequest request) {
         String rawOtp = otpGenerator.generate();
         String hash = otpHasher.hash(rawOtp);
@@ -71,16 +89,12 @@ public class OtpDomainService implements OtpUseCase {
         );
 
         return otpRepositoryPort.save(otp)
-                .flatMap(savedOtp -> {
-                    var outboxEvent = OutboxEventFactory.createOtpSendEvent(
-                            savedOtp,
-                            rawOtp,
-                            request.getChannel(),
-                            request.getPurpose()
-                    );
-                    return outboxRepositoryPort.save(outboxEvent)
-                            .replaceWith(savedOtp);
-                })
+                .invoke(savedOtp -> asyncOtpDeliveryService.sendOtp(
+                        request.getChannel(),
+                        savedOtp.getTarget(),
+                        rawOtp,
+                        request.getPurpose()
+                ))
                 .map(saved ->
                         new OtpResponse(
                                 saved.getReferenceId(),

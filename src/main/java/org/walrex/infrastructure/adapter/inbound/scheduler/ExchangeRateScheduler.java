@@ -6,21 +6,19 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.walrex.application.port.input.UpdateAstroPayExchangeRateUseCase;
 import org.walrex.application.port.input.UpdateExchangeRatesUseCase;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Scheduler para actualizar tasas de cambio cada 3 minutos
+ * Scheduler de polling Binance P2P para tasas de cambio.
  *
- * ARQUITECTURA:
- * - updateExchangeRatesScheduled() se ejecuta cada 3 minutos (cron)
- * - updateExchangeRatesInitial() se ejecuta una sola vez, 10 segundos después del inicio
- * - Usa Scheduled.SkipPredicate para deshabilitar el scheduler inicial después de la primera ejecución
- * - Ambos usan @Scheduled que proporciona el contexto duplicado de Vert.x requerido
- * - ExchangeRateService contiene la lógica reactiva con Mutiny
- * - @WithSession se maneja en los adaptadores de persistencia
+ * DESHABILITADO: reemplazado por FinnhubWebSocketAdapter (WebSocket en tiempo real).
+ * Para re-activar, establecer en application.yml:
+ *   walrex.scheduler.exchange-rate.cron=0 *\/10 * * * ?
+ *   walrex.scheduler.exchange-rate.initial.every=10s
  */
 @Slf4j
 @ApplicationScoped
@@ -28,6 +26,9 @@ public class ExchangeRateScheduler {
 
     @Inject
     UpdateExchangeRatesUseCase exchangeRateService;
+
+    @Inject
+    UpdateAstroPayExchangeRateUseCase astroPayService;
 
     /**
      * Predicado para deshabilitar el scheduler inicial después de la primera ejecución
@@ -52,29 +53,15 @@ public class ExchangeRateScheduler {
         }
     }
 
-    /**
-     * Ejecuta la actualización de tasas cada 10 minutos
-     *
-     * IMPORTANTE:
-     * - @Scheduled proporciona automáticamente el contexto duplicado de Vert.x
-     * - Llama al método común performUpdate()
-     */
-    @Scheduled(cron = "0 */10 * * * ?", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(cron = "${walrex.scheduler.exchange-rate.cron:off}",
+               concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public Uni<Void> updateExchangeRatesScheduled() {
         log.info("=== [SCHEDULER] Triggered at {} ===", LocalDateTime.now());
         return performUpdate("[SCHEDULER]");
     }
 
-    /**
-     * Ejecuta la primera actualización de tasas 10 segundos después del inicio
-     *
-     * IMPORTANTE:
-     * - Se ejecuta cada 10 segundos PERO skipExecutionIf lo deshabilita después de la primera vez
-     * - SkipAfterFirstExecution retorna false la primera vez (ejecuta) y true después (no ejecuta)
-     * - @Scheduled proporciona el contexto duplicado de Vert.x que requiere Hibernate Reactive
-     * - Llama al método común performUpdate()
-     */
-    @Scheduled(every = "10s", delay = 10, delayUnit = java.util.concurrent.TimeUnit.SECONDS,
+    @Scheduled(every = "${walrex.scheduler.exchange-rate.initial.every:off}",
+               delay = 10, delayUnit = java.util.concurrent.TimeUnit.SECONDS,
                skipExecutionIf = SkipAfterFirstExecution.class,
                concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public Uni<Void> updateExchangeRatesInitial() {
@@ -98,6 +85,11 @@ public class ExchangeRateScheduler {
                 .onFailure().invoke(failure ->
                     log.error("=== {} Failed to update exchange rates ===", context, failure)
                 )
-                .replaceWithVoid();
+                .replaceWithVoid()
+                .chain(() -> astroPayService.updateRatesForActiveRoutes()
+                        .invoke(() -> log.info("=== {} AstroPay rates updated ===", context))
+                        .onFailure().invoke(e ->
+                                log.error("=== {} Failed to update AstroPay rates: {} ===", context, e.getMessage()))
+                        .onFailure().recoverWithNull());
     }
 }

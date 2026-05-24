@@ -39,7 +39,6 @@ public class EmailOtpSenderAdapter implements OtpSenderPort {
             return Uni.createFrom().voidItem();
         }
 
-        LOG.infof("TEMPORARY DEBUG: OTP for %s is %s", target, otp);
         LOG.infof("Attempting to send OTP email for purpose %s to %s", purpose, target);
 
         String html = otpEmail

@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS exchange_rate_types (
 );
 
 -- Índices para optimizar consultas
-CREATE INDEX idx_exchange_rate_types_country_active ON exchange_rate_types(country_id, is_active, date_rate DESC);
-CREATE INDEX idx_exchange_rate_types_code ON exchange_rate_types(code_rate);
+CREATE INDEX IF NOT EXISTS idx_exchange_rate_types_country_active ON exchange_rate_types(country_id, is_active, date_rate DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rate_types_code ON exchange_rate_types(code_rate);
 
 -- Datos de ejemplo para Venezuela
 INSERT INTO exchange_rate_types (country_id, code_rate, name_rate, rate_value, base_currency_id, display_order) 

@@ -15,12 +15,22 @@ quarkus:
     enabled: false
   test:
     integration-test-profile: test
+  flyway:
+    migrate-at-start: true
+    locations: db/migration
+    baseline-on-migrate: true
+    baseline-version: "10"
+    repair-at-start: true
   datasource:
     devservices:
       enabled: false
     db-kind: postgresql
     username: postgres
     password: 12345
+    jdbc:
+      url: jdbc:postgresql://127.0.0.1:5432/walrex_db
+      min-size: 1
+      max-size: 4
     reactive:
       url: postgresql://127.0.0.1:5432/walrex_db
       max-size: 20
@@ -181,6 +191,16 @@ quarkus:
         name: accounting_data
 
   rest-client:
+    astropay:
+      url: ${ASTROPAY_URL:https://partners-api.astropay.com}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 10000
+      connect-timeout: 5000
+    elasticsearch:
+      url: ${ELASTICSEARCH_URL:http://localhost:9200}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 10000
+      connect-timeout: 5000
     binance-p2p:
       url: https://p2p.binance.com
       scope: jakarta.enterprise.context.ApplicationScoped
@@ -218,7 +238,6 @@ quarkus:
 google:
   cloud:
     service-account-location: firebase-service-account.json
-
 
 azure:
   doc:
@@ -271,3 +290,46 @@ mp:
 fcm:
   enabled: true
   credentials-file: firebase-service-account.json
+
+screening:
+  threshold:
+    block: ${SCREENING_THRESHOLD_BLOCK:8.0}
+    review: ${SCREENING_THRESHOLD_REVIEW:4.0}
+
+astropay:
+  # Porcentaje de ganancia que se descuenta a la tasa recibida: rate / (1 + margin-percent/100)
+  # Ejemplo: margin-percent=6 → divisor=1.06 → rate/1.06
+  margin-percent: ${ASTROPAY_MARGIN_PERCENT:6}
+
+finnhub:
+  api-token: ${FINNHUB_API_TOKEN:d80du0pr01qq9ln3ha1gd80du0pr01qq9ln3ha20}
+  # Proveedor de símbolos: OANDA | FXCM
+  symbol-provider: ${FINNHUB_SYMBOL_PROVIDER:OANDA}
+  # Delay en ms antes de cada reintento de reconexión
+  reconnect-delay-ms: ${FINNHUB_RECONNECT_DELAY_MS:5000}
+  # Variación porcentual mínima para disparar consulta a AstroPay
+  price-change-threshold: ${FINNHUB_PRICE_CHANGE_THRESHOLD:2.5}
+
+binance:
+  spot:
+    stream:
+      # Par a monitorear como sensor de volatilidad (btcusdt | penusdt | ethusdt)
+      symbol: ${BINANCE_SPOT_SYMBOL:btcusdt}
+      # Variación % que dispara el fetch Binance P2P
+      price-change-threshold: ${BINANCE_SPOT_THRESHOLD:1.5}
+      # Minutos de cooldown entre triggers (evita ráfagas)
+      cooldown-minutes: ${BINANCE_SPOT_COOLDOWN_MINUTES:5}
+      # Delay en ms antes de cada reintento de reconexión
+      reconnect-delay-ms: ${BINANCE_SPOT_RECONNECT_DELAY_MS:5000}
+
+walrex:
+  scheduler:
+    exchange-rate:
+      # "off" = deshabilitado (reemplazado por FinnhubStreamManager)
+      # Para re-activar: cron=0 */10 * * * ?  initial.every=10s
+      cron: "off"
+      initial:
+        every: "off"
+    market-sync:
+      # Reconciliación BD vs. suscripciones en memoria
+      every: ${MARKET_SYNC_EVERY:24h}

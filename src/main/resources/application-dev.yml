@@ -41,4 +41,15 @@ quarkus:
         name: "RemesasBotServer"
         version: 1.0.0
   # SmallRye Fault Tolerance Metrics
+  flyway:
+    migrate-at-start: true
+    locations: db/migration
+    baseline-on-migrate: true
+    baseline-version: "10"
+    repair-at-start: true
+  datasource:
+    jdbc:
+      url: jdbc:postgresql://127.0.0.1:5432/walrex_db
+      min-size: 1
+      max-size: 4
   smallrye-fault-tolerance:

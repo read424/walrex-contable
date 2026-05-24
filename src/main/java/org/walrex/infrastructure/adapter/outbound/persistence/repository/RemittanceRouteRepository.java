@@ -50,6 +50,23 @@ public class RemittanceRouteRepository implements PanacheRepositoryBase<Remittan
     }
 
     /**
+     * Obtiene rutas activas filtradas por rate_provider (ej: "ASTROPAY", "BINANCE")
+     */
+    public Uni<List<RemittanceRouteEntity>> findActiveByProvider(String rateProvider) {
+        return find(
+                "SELECT r FROM RemittanceRouteEntity r " +
+                        "JOIN FETCH r.countryCurrencyFrom ccFrom " +
+                        "JOIN FETCH ccFrom.country " +
+                        "JOIN FETCH ccFrom.currency " +
+                        "JOIN FETCH r.countryCurrencyTo ccTo " +
+                        "JOIN FETCH ccTo.country " +
+                        "JOIN FETCH ccTo.currency " +
+                        "WHERE r.isActive = '1' AND r.rateProvider = ?1",
+                rateProvider
+        ).list();
+    }
+
+    /**
      * Busca una ruta específica entre dos country_currencies
      */
     public Uni<RemittanceRouteEntity> findByCountryCurrencies(

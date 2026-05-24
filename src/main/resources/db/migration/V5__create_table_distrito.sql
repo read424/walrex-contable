@@ -1,4 +1,4 @@
-CREATE TABLE district (
+CREATE TABLE IF NOT EXISTS district (
     id_district SERIAL PRIMARY KEY,
     cod_district CHAR(4) NOT NULL,
     name_district VARCHAR(100) NOT NULL,

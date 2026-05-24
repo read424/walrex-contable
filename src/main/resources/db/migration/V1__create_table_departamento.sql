@@ -1,4 +1,4 @@
-CREATE TABLE departament (
+CREATE TABLE IF NOT EXISTS departament (
     id_departament SERIAL PRIMARY KEY,
 
     cod_departament CHAR(2) NOT NULL UNIQUE,       -- UBIGEO: 01, 02, ..., 25

@@ -9,14 +9,25 @@ ALTER TABLE price_exchange ALTER COLUMN id_currency_quote TYPE BIGINT;
 ALTER TABLE price_exchange DROP CONSTRAINT IF EXISTS fk_price_exchange_currency_base;
 ALTER TABLE price_exchange DROP CONSTRAINT IF EXISTS fk_price_exchange_currency_quote;
 
--- Paso 3: Agregar FKs nuevas apuntando a country_currencies
-ALTER TABLE price_exchange
-ADD CONSTRAINT fk_price_exchange_cc_base
-FOREIGN KEY (id_currency_base) REFERENCES country_currencies(id);
+-- Paso 3: Agregar FKs nuevas apuntando a country_currencies (idempotente)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_price_exchange_cc_base'
+    ) THEN
+        ALTER TABLE price_exchange
+        ADD CONSTRAINT fk_price_exchange_cc_base
+        FOREIGN KEY (id_currency_base) REFERENCES country_currencies(id);
+    END IF;
 
-ALTER TABLE price_exchange
-ADD CONSTRAINT fk_price_exchange_cc_quote
-FOREIGN KEY (id_currency_quote) REFERENCES country_currencies(id);
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_price_exchange_cc_quote'
+    ) THEN
+        ALTER TABLE price_exchange
+        ADD CONSTRAINT fk_price_exchange_cc_quote
+        FOREIGN KEY (id_currency_quote) REFERENCES country_currencies(id);
+    END IF;
+END $$;
 
 -- Paso 4: Recrear índice para las columnas actualizadas
 DROP INDEX IF EXISTS idx_price_exchange_currencies_date;

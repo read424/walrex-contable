@@ -18,15 +18,14 @@ CREATE TABLE IF NOT EXISTS public.country_currency_payment_methods (
     CONSTRAINT fk_ccpm_country_currency FOREIGN KEY (id_country_currency)
         REFERENCES public.country_currencies(id) ON DELETE CASCADE,
     CONSTRAINT fk_ccpm_bank FOREIGN KEY (id_bank)
-        REFERENCES public.banks(id) ON DELETE CASCADE,
+        REFERENCES public.financial_institution(id) ON DELETE CASCADE,
     CONSTRAINT uk_ccpm_country_currency_bank UNIQUE (id_country_currency, id_bank),
     CONSTRAINT ck_ccpm_active CHECK (is_active IN ('0', '1'))
 );
 
 -- Table and column comments
 COMMENT ON TABLE public.country_currency_payment_methods IS
-    'Junction table linking country_currencies to banks (payment methods) for Binance P2P queries. ' ||
-    'Each row represents an active payment method available for a specific country-currency combination.';
+    'Junction table linking country_currencies to banks (payment methods) for Binance P2P queries. Each row represents an active payment method available for a specific country-currency combination.';
 
 COMMENT ON COLUMN public.country_currency_payment_methods.id_country_currency IS
     'Foreign key to country_currencies table (e.g., Peru-PEN, Venezuela-VES)';
@@ -68,8 +67,8 @@ SELECT
     '1' as is_active
 FROM public.country_currencies cc
 JOIN public.country c ON cc.country_id = c.id
-JOIN public.banks b ON b.id_country = c.id
-WHERE c.alphabetic_code_2 = 'PE'       -- Peru
+JOIN public.financial_institution b ON b.id_country = c.id
+WHERE c.code_iso2 = 'PE'       -- Peru
   AND b.status = '1'                    -- Active bank
   AND b.name_pay_binance IS NOT NULL    -- Has Binance payment code
   AND cc.is_operational = true          -- Operational currency
@@ -85,8 +84,8 @@ SELECT
     '1' as is_active
 FROM public.country_currencies cc
 JOIN public.country c ON cc.country_id = c.id
-JOIN public.banks b ON b.id_country = c.id
-WHERE c.alphabetic_code_2 = 'VE'       -- Venezuela
+JOIN public.financial_institution b ON b.id_country = c.id
+WHERE c.code_iso2 = 'VE'       -- Venezuela
   AND b.status = '1'                    -- Active bank
   AND b.name_pay_binance IS NOT NULL    -- Has Binance payment code
   AND cc.is_operational = true          -- Operational currency
