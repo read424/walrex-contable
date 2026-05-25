@@ -18,14 +18,13 @@ quarkus:
   vault:
     url: ${VAULT_URL:http://127.0.0.1:8200}
     authentication:
-      app-role:
-        role-id: ${VAULT_ROLE_ID}
-        secret-id: ${VAULT_SECRET_ID}
+      client-token: ${VAULT_TOKEN}
     kv-secret-engine-mount-path: secret
     kv-secret-engine-version: 2
     secret-config-kv-path:
       - walrex/infra/database
       - walrex/infra/redis
+      - walrex/infra/azure
       - walrex/app/finnhub
       - walrex/app/groq
       - walrex/app/hugging-face
