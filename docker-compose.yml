@@ -119,10 +119,6 @@ services:
     networks:
       - observability-net
 
-  # ---------------------------------------------------------------------------
-  # Vault en modo dev — temporal hasta instalar Vault en Oracle Cloud
-  # Token fijo: dev-root-token  |  UI: http://localhost:8200
-  # ---------------------------------------------------------------------------
   vault-dev:
     image: hashicorp/vault:1.17
     container_name: vault-dev
@@ -137,11 +133,6 @@ services:
     networks:
       - observability-net
 
-  # ---------------------------------------------------------------------------
-  # Aplicación principal Walrex
-  # Construir imagen antes de levantar: ./mvnw package -DskipTests
-  #                                     docker build -t walrex-app .
-  # ---------------------------------------------------------------------------
   walrex-app:
     image: walrex-app:latest
     container_name: walrex-app
