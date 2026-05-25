@@ -35,29 +35,6 @@ services:
     networks:
       - observability-net
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.103.0
-    container_name: otel-collector
-    restart: unless-stopped
-    command: [ "--config=/etc/otel/otel-collector.yml" ]
-    volumes:
-      - ./otel-collector/otel-collector.yml:/etc/otel/otel-collector.yml:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "13133:13133" # health_check
-    environment:
-      # Credenciales Grafana Cloud
-      # Instance ID y API Key se obtienen en: grafana.com → My Account → Stack
-      GRAFANA_CLOUD_OTLP_ENDPOINT: ${GRAFANA_CLOUD_OTLP_ENDPOINT}
-      GRAFANA_CLOUD_INSTANCE_ID: ${GRAFANA_CLOUD_INSTANCE_ID}
-      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY}
-    depends_on:
-      - postgres-exporter
-      - redis-exporter
-    networks:
-      - observability-net
-
   vault-dev:
     image: hashicorp/vault:1.17
     container_name: vault-dev
@@ -113,14 +90,14 @@ services:
 
       FCM_CREDENTIALS_PATH: /etc/walrex/firebase-service-account.json
 
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      # IP o hostname de la instancia externa donde corre otel-collector
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4317
       DEPLOYMENT_ENV: development
 
     volumes:
       - /etc/walrex:/etc/walrex:ro
     depends_on:
       - vault-dev
-      - otel-collector
     networks:
       - observability-net
 
