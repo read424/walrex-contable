@@ -15,23 +15,6 @@ quarkus:
     enabled: false
   test:
     integration-test-profile: test
-
-  # ---------------------------------------------------------------------------
-  # HashiCorp Vault — gestión centralizada de secrets
-  # Instancia dedicada en Oracle Cloud (VM separada de la app)
-  #
-  # Estructura KV v2 esperada (mount: secret/):
-  #   walrex/infra/database  → db-username, db-password, db-host, db-name
-  #   walrex/infra/redis     → redis-host  (sin password en red privada)
-  #   walrex/app/jwt         → jwt-secret, registration-token-secret
-  #   walrex/app/email       → email-password
-  #   walrex/app/twilio      → twilio-account-sid, twilio-auth-token,
-  #                            twilio-from-number, twilio-whatsapp-from
-  #   walrex/app/apis        → openai-api-key, groq-api-key,
-  #                            hugging-face-api-key, finnhub-api-token,
-  #                            azure-doc-intel-key, qdrant-api-key
-  #   walrex/app/fcm         → fcm-credentials-path
-  # ---------------------------------------------------------------------------
   vault:
     url: ${VAULT_URL:http://127.0.0.1:8200}
     authentication:
@@ -43,10 +26,12 @@ quarkus:
     secret-config-kv-path:
       - walrex/infra/database
       - walrex/infra/redis
+      - walrex/app/finnhub
+      - walrex/app/groq
+      - walrex/app/hugging-face
       - walrex/app/jwt
-      - walrex/app/email
+      - walrex/app/mail
       - walrex/app/twilio
-      - walrex/app/apis
       - walrex/app/fcm
     # MEDIUM oculta valores en logs; usar LOW solo en dev local
     log-confidentiality-level: MEDIUM
