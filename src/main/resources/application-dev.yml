@@ -58,11 +58,15 @@ quarkus:
   # Luego carga secrets con: docs/vault/seed-dev-secrets.sh
   # ---------------------------------------------------------------------------
   vault:
-    url: http://127.0.0.1:8200
+    url: ${VAULT_URL:http://127.0.0.1:8200}
     authentication:
       client-token: ${VAULT_TOKEN:dev-root-token}
     log-confidentiality-level: LOW
     devservices:
       enabled: false
+
+  log:
+    console:
+      json: false    # texto plano en dev, más legible en consola
 
   smallrye-fault-tolerance:

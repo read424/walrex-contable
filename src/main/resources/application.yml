@@ -25,6 +25,8 @@ quarkus:
       - walrex/infra/database
       - walrex/infra/redis
       - walrex/infra/azure
+      - walrex/infra/qdrant
+      - walrex/app/openai
       - walrex/app/finnhub
       - walrex/app/groq
       - walrex/app/hugging-face
@@ -118,17 +120,23 @@ quarkus:
         enabled: true
 
   mailer:
-    from: developer@texlamerced.com
-    host: mail.texlamerced.com
+    from: ${email-user:developer@texlamerced.com}
+    host: ${email-host:mail.texlamerced.com}
     port: 465
     ssl: true
-    username: developer@texlamerced.com
+    username: ${email-user:developer@texlamerced.com}
     # Clave inyectada desde walrex/app/email
     password: ${email-password}
 
   log:
     level: INFO
     min-level: TRACE
+    console:
+      json: true
+      json:
+        date-format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+        pretty-print: false
+        fields: timestamp,level,loggerName,message,threadName,traceId,spanId
     category:
       "io.quarkus.security":
         level: INFO
@@ -258,7 +266,6 @@ quarkus:
     distance: Cosine
     collection:
       name: accounting_data
-
 
 google:
   cloud:
