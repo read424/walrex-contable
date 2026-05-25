@@ -1,0 +1,12 @@
+target/
+.git/
+.idea/
+*.iml
+*.md
+docs/
+grafana/
+prometheus/
+loki/
+tempo/
+.mvn/wrapper/maven-wrapper.jar
+src/test/
