@@ -144,8 +144,8 @@ services:
       QUARKUS_PROFILE: dev
 
       # Vault apuntando al servicio vault-dev de este compose
-      QUARKUS_VAULT_URL: http://vault-dev:8200
-      QUARKUS_VAULT_AUTHENTICATION_CLIENT_TOKEN: dev-root-token
+      VAULT_URL: http://vault-dev:8200
+      VAULT_TOKEN: dev-root-token
 
       # -----------------------------------------------------------------------
       # TEMPORAL — estas claves pasarán a los KV paths de Vault una vez
