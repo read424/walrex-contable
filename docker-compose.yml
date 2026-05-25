@@ -119,6 +119,94 @@ services:
     networks:
       - observability-net
 
+  # ---------------------------------------------------------------------------
+  # Vault en modo dev — temporal hasta instalar Vault en Oracle Cloud
+  # Token fijo: dev-root-token  |  UI: http://localhost:8200
+  # ---------------------------------------------------------------------------
+  vault-dev:
+    image: hashicorp/vault:1.17
+    container_name: vault-dev
+    restart: unless-stopped
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - observability-net
+
+  # ---------------------------------------------------------------------------
+  # Aplicación principal Walrex
+  # Construir imagen antes de levantar: ./mvnw package -DskipTests
+  #                                     docker build -t walrex-app .
+  # ---------------------------------------------------------------------------
+  walrex-app:
+    image: walrex-app:latest
+    container_name: walrex-app
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      # Perfil Quarkus → usa application-dev.yml (Swagger ON, token auth)
+      QUARKUS_PROFILE: dev
+
+      # Vault apuntando al servicio vault-dev de este compose
+      QUARKUS_VAULT_URL: http://vault-dev:8200
+      QUARKUS_VAULT_AUTHENTICATION_CLIENT_TOKEN: dev-root-token
+
+      # -----------------------------------------------------------------------
+      # TEMPORAL — estas claves pasarán a los KV paths de Vault una vez
+      # configurado HashiCorp Vault en Oracle Cloud. Las variables de entorno
+      # tienen prioridad sobre Vault (env=300 > Vault=295 en Quarkus Config).
+      # -----------------------------------------------------------------------
+
+      # walrex/infra/database
+      DB_USERNAME: walrex_user
+      DB_PASSWORD: changeme
+      DB_HOST: postgres-dev
+      DB_NAME: walrex_db
+
+      # walrex/infra/redis
+      REDIS_HOST: redis-testing
+
+      # walrex/app/jwt
+      JWT_SECRET: changeme-jwt-secret-must-be-at-least-32-characters
+      REGISTRATION_TOKEN_SECRET: changeme-registration-token-secret
+
+      # walrex/app/email
+      EMAIL_PASSWORD: changeme
+
+      # walrex/app/twilio
+      TWILIO_ACCOUNT_SID: ACxxx
+      TWILIO_AUTH_TOKEN: xxx
+      TWILIO_FROM_NUMBER: "+123456789"
+      TWILIO_WHATSAPP_FROM: "whatsapp:+123456789"
+
+      # walrex/app/apis
+      OPENAI_API_KEY: changeme
+      GROQ_API_KEY: changeme
+      HUGGING_FACE_API_KEY: ""
+      FINNHUB_API_TOKEN: changeme
+      AZURE_DOC_INTEL_KEY: changeme
+      QDRANT_API_KEY: ""
+
+      # walrex/app/fcm  (ruta dentro del contenedor)
+      FCM_CREDENTIALS_PATH: /etc/walrex/firebase-service-account.json
+
+      # Observabilidad → apunta a los servicios del compose
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      DEPLOYMENT_ENV: development
+
+    volumes:
+      # Credenciales Firebase fuera del repo → montar en la ruta del contenedor
+      - /etc/walrex:/etc/walrex:ro
+    depends_on:
+      - vault-dev
+    networks:
+      - observability-net
+
 networks:
   observability-net:
     name: net-web-nginx
