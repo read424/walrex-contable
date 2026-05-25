@@ -6,8 +6,6 @@
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EXTENSIONES
--- Requiere que pgvector esté disponible en el servidor PostgreSQL.
--- Si no está instalado: sudo apt-get install postgresql-16-pgvector
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS vector;
 
