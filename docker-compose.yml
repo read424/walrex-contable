@@ -50,50 +50,42 @@ services:
       - observability-net
 
   walrex-app:
-    image: walrex-app:latest
+    image: read424/walrex-wallet:latest
     container_name: walrex-app
     restart: unless-stopped
     ports:
       - "8089:8089"
     environment:
-      QUARKUS_PROFILE: dev
-
+      # Vault — fuente de todos los secrets de la aplicación
       VAULT_URL: http://vault-dev:8200
       VAULT_TOKEN: dev-root-token
 
-      # -----------------------------------------------------------------------
-      # TEMPORAL — migrar a Vault KV cuando esté configurado
-      # -----------------------------------------------------------------------
-      DB_USERNAME: walrex_user
-      DB_PASSWORD: changeme
-      DB_HOST: postgres-dev
-      DB_NAME: walrex_db
-
-      REDIS_HOST: redis-testing
-
-      JWT_SECRET: changeme-jwt-secret-must-be-at-least-32-characters
-      REGISTRATION_TOKEN_SECRET: changeme-registration-token-secret
-
-      EMAIL_PASSWORD: changeme
-
-      TWILIO_ACCOUNT_SID: ACxxx
-      TWILIO_AUTH_TOKEN: xxx
-      TWILIO_FROM_NUMBER: "+123456789"
-      TWILIO_WHATSAPP_FROM: "whatsapp:+123456789"
-
-      OPENAI_API_KEY: changeme
-      GROQ_API_KEY: changeme
-      HUGGING_FACE_API_KEY: ""
-      FINNHUB_API_TOKEN: changeme
-      AZURE_DOC_INTEL_KEY: changeme
-      QDRANT_API_KEY: ""
-
-      FCM_CREDENTIALS_PATH: /etc/walrex/firebase-service-account.json
-
+      # Observabilidad
       OTEL_EXPORTER_OTLP_ENDPOINT: http://10.0.1.48:4317
       DEPLOYMENT_ENV: development
 
+      # Parámetros operacionales (no secrets)
+      ASTROPAY_URL: https://partners-api.astropay.com
+      ASTROPAY_MARGIN_PERCENT: 6
+
+      ELASTICSEARCH_URL: http://localhost:9200
+      FACE_MATCH_SERVICE_URL: http://127.0.0.1:8000
+      SCREENING_THRESHOLD_BLOCK: 8.0
+      SCREENING_THRESHOLD_REVIEW: 4.0
+
+      FINNHUB_SYMBOL_PROVIDER: OANDA
+      FINNHUB_RECONNECT_DELAY_MS: 5000
+      FINNHUB_PRICE_CHANGE_THRESHOLD: 2.5
+
+      BINANCE_SPOT_SYMBOL: btcusdt
+      BINANCE_SPOT_THRESHOLD: 1.5
+      BINANCE_SPOT_COOLDOWN_MINUTES: 5
+      BINANCE_SPOT_RECONNECT_DELAY_MS: 5000
+
+      MARKET_SYNC_EVERY: 24h
+
     volumes:
+      # Credenciales Firebase fuera del repo → montar en la ruta del contenedor
       - /etc/walrex:/etc/walrex:ro
     depends_on:
       - vault-dev
