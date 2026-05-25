@@ -28,7 +28,7 @@ quarkus:
   redis:
     devservices:
       enabled: false
-    hosts: redis://127.0.0.1:6379
+    hosts: redis://${REDIS_HOST:127.0.0.1}:6379
     timeout: 10s
     max-pool-size: 20
     max-pool-waiting: 24
@@ -45,13 +45,17 @@ quarkus:
     migrate-at-start: true
     locations: db/migration
     baseline-on-migrate: true
-    baseline-version: "10"
+    baseline-version: "0"
     repair-at-start: true
   datasource:
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:12345}
     jdbc:
-      url: jdbc:postgresql://127.0.0.1:5432/walrex_db
+      url: jdbc:postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
       min-size: 1
       max-size: 4
+    reactive:
+      url: postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
   # ---------------------------------------------------------------------------
   # Vault — modo desarrollo
   # Levanta un servidor local: vault server -dev -dev-root-token-id=dev-root-token
