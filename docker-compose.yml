@@ -90,8 +90,7 @@ services:
 
       FCM_CREDENTIALS_PATH: /etc/walrex/firebase-service-account.json
 
-      # IP o hostname de la instancia externa donde corre otel-collector
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://10.0.1.48:4317
       DEPLOYMENT_ENV: development
 
     volumes:
