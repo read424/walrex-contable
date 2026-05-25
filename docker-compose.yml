@@ -21,101 +21,40 @@ services:
     networks:
       - observability-net
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    restart: always
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
-    networks:
-      - observability-net
-    depends_on:
-      - postgres-exporter
-      - redis-exporter
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: always
-    user: "0"
-    ports:
-      - "3030:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: "admin"
-      GF_SECURITY_ADMIN_USER: "admin"
-      GF_INSTALL_PLUGINS: ""
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    networks:
-      - observability-net
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
-
-  loki:
-    image: grafana/loki:2.9.3
-    container_name: loki
-    restart: always
-    user: "0"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-      - "12201:12201/udp"
-    networks:
-      - observability-net
-
-  promtail:
-    image: grafana/promtail:2.9.3
-    container_name: promtail
-    restart: always
-    volumes:
-      - /var/log:/var/log
-      - ./loki/promtail-config.yml:/etc/promtail/config.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - observability-net
-
-  tempo:
-    image: grafana/tempo:2.4.1
-    container_name: tempo
-    restart: always
-    command: [ "-config.file=/etc/tempo.yaml" ]
-    volumes:
-      - ./tempo/tempo.yaml:/etc/tempo.yaml
-      - tempo_data:/var/tempo
-    ports:
-      - "4317:4317" # OTLP gRPC
-      - "3200:3200" # Tempo UI
-    networks:
-      - observability-net
-
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant-vector-db
     restart: always
     ports:
-      - "6333:6333" # HTTP API
-      - "6334:6334" # gRPC API
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_storage:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
+    networks:
+      - observability-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.103.0
+    container_name: otel-collector
+    restart: unless-stopped
+    command: [ "--config=/etc/otel/otel-collector.yml" ]
+    volumes:
+      - ./otel-collector/otel-collector.yml:/etc/otel/otel-collector.yml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # health_check
+    environment:
+      # Credenciales Grafana Cloud
+      # Instance ID y API Key se obtienen en: grafana.com → My Account → Stack
+      GRAFANA_CLOUD_OTLP_ENDPOINT: ${GRAFANA_CLOUD_OTLP_ENDPOINT}
+      GRAFANA_CLOUD_INSTANCE_ID: ${GRAFANA_CLOUD_INSTANCE_ID}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY}
+    depends_on:
+      - postgres-exporter
+      - redis-exporter
     networks:
       - observability-net
 
@@ -140,42 +79,31 @@ services:
     ports:
       - "8089:8089"
     environment:
-      # Perfil Quarkus → usa application-dev.yml (Swagger ON, token auth)
       QUARKUS_PROFILE: dev
 
-      # Vault apuntando al servicio vault-dev de este compose
       VAULT_URL: http://vault-dev:8200
       VAULT_TOKEN: dev-root-token
 
       # -----------------------------------------------------------------------
-      # TEMPORAL — estas claves pasarán a los KV paths de Vault una vez
-      # configurado HashiCorp Vault en Oracle Cloud. Las variables de entorno
-      # tienen prioridad sobre Vault (env=300 > Vault=295 en Quarkus Config).
+      # TEMPORAL — migrar a Vault KV cuando esté configurado
       # -----------------------------------------------------------------------
-
-      # walrex/infra/database
       DB_USERNAME: walrex_user
       DB_PASSWORD: changeme
       DB_HOST: postgres-dev
       DB_NAME: walrex_db
 
-      # walrex/infra/redis
       REDIS_HOST: redis-testing
 
-      # walrex/app/jwt
       JWT_SECRET: changeme-jwt-secret-must-be-at-least-32-characters
       REGISTRATION_TOKEN_SECRET: changeme-registration-token-secret
 
-      # walrex/app/email
       EMAIL_PASSWORD: changeme
 
-      # walrex/app/twilio
       TWILIO_ACCOUNT_SID: ACxxx
       TWILIO_AUTH_TOKEN: xxx
       TWILIO_FROM_NUMBER: "+123456789"
       TWILIO_WHATSAPP_FROM: "whatsapp:+123456789"
 
-      # walrex/app/apis
       OPENAI_API_KEY: changeme
       GROQ_API_KEY: changeme
       HUGGING_FACE_API_KEY: ""
@@ -183,18 +111,16 @@ services:
       AZURE_DOC_INTEL_KEY: changeme
       QDRANT_API_KEY: ""
 
-      # walrex/app/fcm  (ruta dentro del contenedor)
       FCM_CREDENTIALS_PATH: /etc/walrex/firebase-service-account.json
 
-      # Observabilidad → apunta a los servicios del compose
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       DEPLOYMENT_ENV: development
 
     volumes:
-      # Credenciales Firebase fuera del repo → montar en la ruta del contenedor
       - /etc/walrex:/etc/walrex:ro
     depends_on:
       - vault-dev
+      - otel-collector
     networks:
       - observability-net
 
@@ -204,8 +130,4 @@ networks:
     external: true
 
 volumes:
-  grafana_data:
-  tempo_data:
-  prometheus_data:
-  loki_data:
   qdrant_storage:
