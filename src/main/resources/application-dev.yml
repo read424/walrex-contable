@@ -65,8 +65,14 @@ quarkus:
     devservices:
       enabled: false
 
+  otel:
+    logs:
+      exporter: none   # en dev los logs van a consola, no al collector
+    traces:
+      exporter: none   # deshabilitar trazas en dev para no requerir collector
+
   log:
     console:
-      json: false    # texto plano en dev, más legible en consola
+      json: false      # texto plano en dev, más legible en consola
 
   smallrye-fault-tolerance:
