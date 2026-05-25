@@ -35,17 +35,18 @@ services:
     networks:
       - observability-net
 
-  vault-dev:
-    image: hashicorp/vault:1.17
-    container_name: vault-dev
-    restart: unless-stopped
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault
+    restart: always
     ports:
       - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: myroot
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
     cap_add:
       - IPC_LOCK
+    command: vault server -dev
     networks:
       - observability-net
 
@@ -57,8 +58,8 @@ services:
       - "8089:8089"
     environment:
       # Vault — fuente de todos los secrets de la aplicación
-      VAULT_URL: http://vault-dev:8200
-      VAULT_TOKEN: dev-root-token
+      VAULT_URL: http://vault:8200
+      VAULT_TOKEN: myroot
 
       # Observabilidad
       OTEL_EXPORTER_OTLP_ENDPOINT: http://10.0.1.48:4317
@@ -88,7 +89,7 @@ services:
       # Credenciales Firebase fuera del repo → montar en la ruta del contenedor
       - /etc/walrex:/etc/walrex:ro
     depends_on:
-      - vault-dev
+      - vault
     networks:
       - observability-net
 

@@ -64,7 +64,7 @@ quarkus:
   vault:
     url: ${VAULT_URL:http://127.0.0.1:8200}
     authentication:
-      client-token: ${VAULT_TOKEN:dev-root-token}
+      client-token: ${VAULT_TOKEN:myroot}
     log-confidentiality-level: LOW
     devservices:
       enabled: false
