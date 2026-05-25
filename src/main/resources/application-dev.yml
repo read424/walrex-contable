@@ -66,10 +66,8 @@ quarkus:
       enabled: false
 
   otel:
-    logs:
-      exporter: none   # en dev los logs van a consola, no al collector
-    traces:
-      exporter: none   # deshabilitar trazas en dev para no requerir collector
+    sdk:
+      disabled: true   # deshabilitar OTel en dev, no se requiere collector local
 
   log:
     console:
