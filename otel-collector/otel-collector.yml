@@ -1,0 +1,86 @@
+receivers:
+  # Recibe trazas, métricas y logs desde walrex-app via OTLP
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Scrape de métricas de infraestructura (postgres, redis, quarkus)
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: walrex-app
+          scrape_interval: 15s
+          metrics_path: /q/metrics
+          static_configs:
+            - targets: [ 'walrex-app:8089' ]
+        - job_name: postgres
+          scrape_interval: 30s
+          static_configs:
+            - targets: [ 'postgres-exporter:9187' ]
+        - job_name: redis
+          scrape_interval: 30s
+          static_configs:
+            - targets: [ 'redis-exporter:9121' ]
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  batch:
+    timeout: 10s
+    send_batch_size: 1000
+
+  # Enriquecer todos los signals con atributos comunes
+  resource:
+    attributes:
+      - action: upsert
+        key: service.name
+        value: admon-catalogo
+      - action: upsert
+        key: service.version
+        value: "1.0.0"
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Autenticación Basic Auth hacia Grafana Cloud
+  # Usuario = Instance ID  |  Password = API Key con scope metrics/logs/traces
+  basicauth/grafana:
+    client_auth:
+      username: "${GRAFANA_CLOUD_INSTANCE_ID}"
+      password: "${GRAFANA_CLOUD_API_KEY}"
+
+exporters:
+  otlphttp/grafana:
+    endpoint: "${GRAFANA_CLOUD_OTLP_ENDPOINT}"
+    auth:
+      authenticator: basicauth/grafana
+    compression: gzip
+
+  # Logging local del collector (debug, quitar en producción estable)
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [ health_check, basicauth/grafana ]
+  pipelines:
+    traces:
+      receivers:  [ otlp ]
+      processors: [ memory_limiter, resource, batch ]
+      exporters:  [ otlphttp/grafana ]
+
+    metrics:
+      receivers:  [ otlp, prometheus ]
+      processors: [ memory_limiter, resource, batch ]
+      exporters:  [ otlphttp/grafana ]
+
+    logs:
+      receivers:  [ otlp ]
+      processors: [ memory_limiter, resource, batch ]
+      exporters:  [ otlphttp/grafana ]
