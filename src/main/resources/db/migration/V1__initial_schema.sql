@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS country (
     name_iso       VARCHAR(100),
     code_phone_iso VARCHAR(10),
     status         VARCHAR(10),
-    unicode_flag   VARCHAR(10),
+    unicode_flag   VARCHAR(30),
     created_at     TIMESTAMPTZ,
     updated_at     TIMESTAMPTZ,
     deleted_at     TIMESTAMPTZ,
