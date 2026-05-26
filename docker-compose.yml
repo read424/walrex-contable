@@ -21,101 +21,75 @@ services:
     networks:
       - observability-net
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    restart: always
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
-    networks:
-      - observability-net
-    depends_on:
-      - postgres-exporter
-      - redis-exporter
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: always
-    user: "0"
-    ports:
-      - "3030:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: "admin"
-      GF_SECURITY_ADMIN_USER: "admin"
-      GF_INSTALL_PLUGINS: ""
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    networks:
-      - observability-net
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
-
-  loki:
-    image: grafana/loki:2.9.3
-    container_name: loki
-    restart: always
-    user: "0"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
-      - "12201:12201/udp"
-    networks:
-      - observability-net
-
-  promtail:
-    image: grafana/promtail:2.9.3
-    container_name: promtail
-    restart: always
-    volumes:
-      - /var/log:/var/log
-      - ./loki/promtail-config.yml:/etc/promtail/config.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - observability-net
-
-  tempo:
-    image: grafana/tempo:2.4.1
-    container_name: tempo
-    restart: always
-    command: [ "-config.file=/etc/tempo.yaml" ]
-    volumes:
-      - ./tempo/tempo.yaml:/etc/tempo.yaml
-      - tempo_data:/var/tempo
-    ports:
-      - "4317:4317" # OTLP gRPC
-      - "3200:3200" # Tempo UI
-    networks:
-      - observability-net
-
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant-vector-db
     restart: always
     ports:
-      - "6333:6333" # HTTP API
-      - "6334:6334" # gRPC API
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_storage:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
+    networks:
+      - observability-net
+
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault
+    restart: always
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: myroot
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    cap_add:
+      - IPC_LOCK
+    command: vault server -dev
+    networks:
+      - observability-net
+
+  walrex-app:
+    image: read424/walrex-wallet:latest
+    container_name: walrex-app
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      # Vault — fuente de todos los secrets de la aplicación
+      VAULT_URL: http://vault:8200
+      VAULT_TOKEN: myroot
+
+      # Observabilidad
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://10.0.1.48:4317
+      DEPLOYMENT_ENV: development
+
+      # Parámetros operacionales (no secrets)
+      ASTROPAY_URL: https://partners-api.astropay.com
+      ASTROPAY_MARGIN_PERCENT: 6
+
+      ELASTICSEARCH_URL: http://localhost:9200
+      FACE_MATCH_SERVICE_URL: http://127.0.0.1:8000
+      SCREENING_THRESHOLD_BLOCK: 8.0
+      SCREENING_THRESHOLD_REVIEW: 4.0
+
+      FINNHUB_SYMBOL_PROVIDER: OANDA
+      FINNHUB_RECONNECT_DELAY_MS: 5000
+      FINNHUB_PRICE_CHANGE_THRESHOLD: 2.5
+
+      BINANCE_SPOT_SYMBOL: btcusdt
+      BINANCE_SPOT_THRESHOLD: 1.5
+      BINANCE_SPOT_COOLDOWN_MINUTES: 5
+      BINANCE_SPOT_RECONNECT_DELAY_MS: 5000
+
+      MARKET_SYNC_EVERY: 24h
+
+    volumes:
+      # Credenciales Firebase fuera del repo → montar en la ruta del contenedor
+      - /etc/walrex:/etc/walrex:ro
+    depends_on:
+      - vault
     networks:
       - observability-net
 
@@ -125,8 +99,4 @@ networks:
     external: true
 
 volumes:
-  grafana_data:
-  tempo_data:
-  prometheus_data:
-  loki_data:
   qdrant_storage:

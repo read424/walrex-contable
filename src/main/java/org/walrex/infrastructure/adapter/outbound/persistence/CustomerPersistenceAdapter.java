@@ -13,6 +13,7 @@ import org.walrex.domain.model.PagedResult;
 import org.walrex.infrastructure.adapter.outbound.persistence.mapper.CustomerMapper;
 import org.walrex.infrastructure.adapter.outbound.persistence.repository.CustomerRepository;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -163,6 +164,16 @@ public class CustomerPersistenceAdapter implements CustomerRepositoryPort, Custo
     @Override
     public Uni<Long> count(CustomerFilter filter) {
         return repository.countWithFilters(filter);
+    }
+
+    @Override
+    public Uni<Void> updateScreeningResult(Integer clientId, String decision, BigDecimal score,
+                                           String datasets, String entityId, OffsetDateTime checkedAt) {
+        return repository.update(
+                "screeningDecision = ?1, screeningScore = ?2, screeningDatasets = ?3, " +
+                "screeningEntityId = ?4, screeningLastChecked = ?5 where id = ?6",
+                decision, score, datasets, entityId, checkedAt, clientId
+        ).replaceWithVoid();
     }
 
     // ==================== CustomerQueryPort - Streaming ====================

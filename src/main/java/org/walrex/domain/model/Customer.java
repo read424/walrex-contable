@@ -1,5 +1,6 @@
 package org.walrex.domain.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -64,4 +65,33 @@ public class Customer {
 
     @Builder.Default
     private Integer kycLevel = 0;
+
+    // Screening
+    @Builder.Default
+    private String screeningDecision = "PENDING";
+
+    @Builder.Default
+    private BigDecimal screeningScore = BigDecimal.ZERO;
+
+    private String screeningDatasets;
+
+    private String screeningEntityId;
+
+    private OffsetDateTime screeningLastChecked;
+
+    // KYC extendido
+    private Integer kycReviewedBy;
+
+    private OffsetDateTime kycReviewedAt;
+
+    private OffsetDateTime kycApprovedAt;
+
+    private LocalDate kycExpiresAt;
+
+    private String kycNotes;
+
+    // Nacionalidad / país de nacimiento
+    private String nationality;
+
+    private Integer idCountryBirth;
 }

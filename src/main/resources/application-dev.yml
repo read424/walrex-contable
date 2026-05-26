@@ -28,7 +28,7 @@ quarkus:
   redis:
     devservices:
       enabled: false
-    hosts: redis://127.0.0.1:6379
+    hosts: redis://${REDIS_HOST:127.0.0.1}:6379
     timeout: 10s
     max-pool-size: 20
     max-pool-waiting: 24
@@ -41,4 +41,40 @@ quarkus:
         name: "RemesasBotServer"
         version: 1.0.0
   # SmallRye Fault Tolerance Metrics
+  flyway:
+    migrate-at-start: true
+    locations: db/migration
+    baseline-on-migrate: true
+    baseline-version: "0"
+    repair-at-start: true
+  datasource:
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:12345}
+    jdbc:
+      url: jdbc:postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
+      min-size: 1
+      max-size: 4
+    reactive:
+      url: postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
+  # ---------------------------------------------------------------------------
+  # Vault — modo desarrollo
+  # Levanta un servidor local: vault server -dev -dev-root-token-id=dev-root-token
+  # Luego carga secrets con: docs/vault/seed-dev-secrets.sh
+  # ---------------------------------------------------------------------------
+  vault:
+    url: ${VAULT_URL:http://127.0.0.1:8200}
+    authentication:
+      client-token: ${VAULT_TOKEN:myroot}
+    log-confidentiality-level: LOW
+    devservices:
+      enabled: false
+
+  otel:
+    sdk:
+      disabled: true   # deshabilitar OTel en dev, no se requiere collector local
+
+  log:
+    console:
+      json: false      # texto plano en dev, más legible en consola
+
   smallrye-fault-tolerance:

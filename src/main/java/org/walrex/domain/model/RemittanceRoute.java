@@ -19,4 +19,6 @@ public class RemittanceRoute {
     private Integer currencyToId;
     private String currencyToCode;
     private String intermediaryAsset;
+
+    private String rateProvider;
 }

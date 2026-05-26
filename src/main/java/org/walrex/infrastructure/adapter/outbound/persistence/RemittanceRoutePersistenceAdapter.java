@@ -50,6 +50,20 @@ public class RemittanceRoutePersistenceAdapter implements RemittanceRouteOutputP
 
     @Override
     @WithSession
+    public Uni<List<ExchangeRateRouteInfo>> findActiveRoutesByProvider(String provider) {
+        log.info("Fetching active routes for provider={}", provider);
+        return remittanceRouteRepository.findActiveByProvider(provider)
+                .onItem().transform(entities -> {
+                    if (entities.isEmpty()) {
+                        log.info("No active routes found for provider={}", provider);
+                        return new ArrayList<ExchangeRateRouteInfo>();
+                    }
+                    return remittanceRouteMapper.toExchangeRateRouteInfoList(entities);
+                });
+    }
+
+    @Override
+    @WithSession
     public Uni<List<ExchangeRateRouteInfo>> findAllActiveExchangeRateRoutes() {
         log.info("Fetching all active exchange rate routes");
 

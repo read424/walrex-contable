@@ -30,6 +30,12 @@ public class OtpResource {
     }
 
     @POST
+    @Path("/resend")
+    public Uni<OtpResponse> resend(OtpGenerateRequest request) {
+        return otpUseCase.resendOtp(request);
+    }
+
+    @POST
     @Path("/validate")
     public Uni<OtpValidationResponse> validate(OtpValidateRequest request) {
         return otpUseCase.validateOtp(request);

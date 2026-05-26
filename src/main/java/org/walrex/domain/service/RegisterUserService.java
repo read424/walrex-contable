@@ -21,6 +21,8 @@ import org.walrex.infrastructure.adapter.inbound.mapper.RegisterUserMapper;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @ApplicationScoped
@@ -43,6 +45,9 @@ public class RegisterUserService implements RegisterUserUseCase {
 
     @Inject
     AccountWalletRepositoryPort accountWalletRepositoryPort;
+
+    @Inject
+    ScreeningService screeningService;
 
     @Override
     @WithTransaction
@@ -68,6 +73,16 @@ public class RegisterUserService implements RegisterUserUseCase {
                     return clientRepositoryPort.save(customer)
                             .onItem().transformToUni(customerId -> {
                                 log.info("Customer saved with ID: {}", customerId);
+
+                                // PASO 3b: Screening contra listas de sanciones (fire-and-forget)
+                                String fullName = Stream.of(customer.getFirstName(), customer.getLastName())
+                                        .filter(s -> s != null && !s.isBlank())
+                                        .collect(Collectors.joining(" "));
+                                screeningService.screenCustomer(customerId, fullName, customer.getNumberDocument())
+                                        .subscribe().with(
+                                                r -> log.info("Screening done for clientId={}: decision={}", customerId, r.getDecision()),
+                                                e -> log.warn("Screening failed for clientId={}: {}", customerId, e.getMessage())
+                                        );
 
                                 // PASO 4: Crear wallets por defecto para el cliente
                                 Integer countryId = request.getCountryId();

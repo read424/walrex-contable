@@ -90,9 +90,13 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
 
                     log.info("Found {} active remittance routes", routes.size());
 
-                    // Agrupar por país + par de monedas (countryFrom:currencyFrom/intermediaryAsset/currencyTo)
-                    // Ejemplo: EC:USD/USDT/VES, PE:PEN/USDT/VES, PE:USD/USDT/VES, US:USD/USDT/VES
+                    // Solo procesar rutas BINANCE sin EUR como base.
+                    // EUR/VES se calcula como tasa derivada (PEN/VES × EUR/PEN) en DerivedExchangeRateService.
+                    // ASTROPAY las maneja AstroPayExchangeRateService.
                     Map<String, ExchangeRateRouteInfo> uniquePairs = routes.stream()
+                            .filter(r -> (r.getRateProvider() == null
+                                    || "BINANCE".equalsIgnoreCase(r.getRateProvider()))
+                                    && !"EUR".equalsIgnoreCase(r.getCurrencyFromCode()))
                             .collect(Collectors.toMap(
                                     route -> route.getCountryFromCode() + ":" +
                                             route.getCurrencyFromCode() + "/" +
@@ -141,6 +145,22 @@ public class ExchangeRateService implements UpdateExchangeRatesUseCase {
                                 saveAverageRates(update).replaceWith(update)
                             );
                 });
+    }
+
+    @Override
+    public Uni<Void> saveRateForRoute(ExchangeRateRouteInfo route, BigDecimal crossRate) {
+        return saveRateWithCache(
+                route.getCountryFromCode(),
+                route.getCountryToCode(),
+                route.getCountryCurrencyFromId().intValue(),
+                route.getCurrencyFromCode(),
+                route.getCountryCurrencyToId().intValue(),
+                route.getCurrencyToCode(),
+                route.getCountryCurrencyFromId(),
+                route.getCountryCurrencyToId(),
+                crossRate,
+                LocalDate.now()
+        ).replaceWithVoid();
     }
 
     /**

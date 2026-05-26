@@ -15,22 +15,61 @@ quarkus:
     enabled: false
   test:
     integration-test-profile: test
+  vault:
+    url: ${VAULT_URL:http://127.0.0.1:8200}
+    authentication:
+      client-token: ${VAULT_TOKEN}
+    kv-secret-engine-mount-path: secret
+    kv-secret-engine-version: 2
+    secret-config-kv-path:
+      - walrex/infra/database
+      - walrex/infra/redis
+      - walrex/infra/azure
+      - walrex/infra/qdrant
+      - walrex/app/openai
+      - walrex/app/finnhub
+      - walrex/app/groq
+      - walrex/app/hugging-face
+      - walrex/app/jwt
+      - walrex/app/mail
+      - walrex/app/twilio
+      - walrex/app/fcm
+    # MEDIUM oculta valores en logs; usar LOW solo en dev local
+    log-confidentiality-level: MEDIUM
+    devservices:
+      enabled: false
+
+  flyway:
+    migrate-at-start: true
+    locations: db/migration
+    baseline-on-migrate: true
+    baseline-version: "0"
+    repair-at-start: true
+
   datasource:
     devservices:
       enabled: false
     db-kind: postgresql
-    username: postgres
-    password: 12345
+    # Claves inyectadas desde walrex/infra/database
+    username: ${db-username}
+    password: ${db-password}
+    jdbc:
+      url: jdbc:postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
+      min-size: 2
+      max-size: 8
     reactive:
-      url: postgresql://127.0.0.1:5432/walrex_db
+      url: postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
       max-size: 20
+
   swagger-ui:
-    always-include: true
+    always-include: false
     path: /swagger-ui
+
   redis:
     devservices:
       enabled: false
-    hosts: redis://127.0.0.1:6379
+    # Clave inyectada desde walrex/infra/redis
+    hosts: redis://${redis-host:127.0.0.1}:6379
     timeout: 10s
     max-pool-size: 20
     max-pool-waiting: 24
@@ -38,6 +77,7 @@ quarkus:
     redis:
       expire-after-write: 30m
       prefix: "wx-admon"
+
   otel:
     enabled: true
     sdk:
@@ -49,7 +89,8 @@ quarkus:
         arg: 1.0
     exporter:
       otlp:
-        endpoint: http://localhost:4317
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+        protocol: grpc
     propagators:
       - tracecontext
       - baggage
@@ -57,13 +98,14 @@ quarkus:
       attributes:
         service.name: admon-catalogo
         service.version: 1.0.0-SNAPSHOT
-        deployment.environment: dev
+        deployment.environment: ${DEPLOYMENT_ENV:dev}
+
   micrometer:
     enabled: true
     registry-enabled-default: false
     export:
       prometheus:
-        path: /q/metrics
+        path: /q/metrics   # otel-collector hace scrape de este endpoint
     binder-enabled-default: true
     binder:
       jvm: true
@@ -77,36 +119,38 @@ quarkus:
         enabled: true
       mp-metrics:
         enabled: true
+
   mailer:
-    from: developer@texlamerced.com
-    host: mail.texlamerced.com
+    from: ${email-user:developer@texlamerced.com}
+    host: ${email-host:mail.texlamerced.com}
     port: 465
     ssl: true
-    username: developer@texlamerced.com
-    password: ${PASSWORD_EMAIL_DEV:p4s52024}
+    username: ${email-user:developer@texlamerced.com}
+    # Clave inyectada desde walrex/app/email
+    password: ${email-password}
+
   log:
     level: INFO
     min-level: TRACE
+    console:
+      json: true
     category:
       "io.quarkus.security":
-        level: DEBUG
+        level: INFO
       "io.smallrye.jwt":
-        level: DEBUG
+        level: INFO
       "io.quarkus.smallrye.jwt":
-        level: DEBUG
+        level: INFO
+
   smallrye-fault-tolerance:
 
   langchain4j:
     devservices:
       enabled: false
-
-    # Define default providers to resolve ambiguity for any unqualified injections
     chat-model:
       provider: openai
     embedding-model:
       provider: openai
-
-    # Named model provider assignments
     groq-chat:
       chat-model:
         provider: openai
@@ -117,21 +161,18 @@ quarkus:
       embedding-model:
         provider: ollama
 
-    # --- Provider-Centric Configurations ---
-
-    # OpenAI Provider Configuration
     openai:
-      # Default OpenAI configuration for embeddings
-      api-key: ${OPENAI_API_KEY:changeme}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${openai-api-key}
       timeout: 60s
       log-requests: false
       log-responses: false
       embedding-model:
         model-name: text-embedding-3-small
         dimensions: 1536
-      # Named model for Groq chat using OpenAI-compatible API
       groq-chat:
-        api-key: ${GROQ_API_KEY:changeme}
+        # Clave inyectada desde walrex/app/apis
+        api-key: ${groq-api-key}
         base-url: https://api.groq.com/openai/v1
         timeout: 60s
         log-requests: false
@@ -140,10 +181,10 @@ quarkus:
           model-name: llama-3.1-8b-instant
           temperature: 0.7
 
-    # HuggingFace Provider Configuration
     hugging-face:
       base-url: https://router.huggingface.co
-      api-key: ${HUGGING_FACE_API_KEY:}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${hugging-face-api-key:}
       timeout: 60s
       log-requests: false
       log-responses: false
@@ -151,11 +192,9 @@ quarkus:
         model-id: "sentence-transformers/all-MiniLM-L6-v2"
         timeout: 60s
 
-    # Ollama Provider Configuration
     ollama:
       base-url: http://localhost:11434
       timeout: 60s
-      # Named model for Ollama chat, to be injected with @ModelName("ollama-chat")
       ollama-chat:
         base-url: http://localhost:11434
         timeout: 60s
@@ -164,23 +203,32 @@ quarkus:
         chat-model:
           model-id: llama3.2
           temperature: 0.7
-      # Named model for Ollama embeddings, to be injected with @ModelName("ollama-embed")
       ollama-embed:
         base-url: http://localhost:11434
         timeout: 60s
         embedding-model:
           model-id: mxbai-embed-large
 
-    # Qdrant configuration
     qdrant:
       host: localhost
       port: 6334
-      api-key: ${QDRANT_API_KEY:}
+      # Clave inyectada desde walrex/app/apis
+      api-key: ${qdrant-api-key:}
       use-tls: false
       collection:
         name: accounting_data
 
   rest-client:
+    astropay:
+      url: ${ASTROPAY_URL:https://partners-api.astropay.com}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 10000
+      connect-timeout: 5000
+    elasticsearch:
+      url: ${ELASTICSEARCH_URL:http://localhost:9200}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      read-timeout: 10000
+      connect-timeout: 5000
     binance-p2p:
       url: https://p2p.binance.com
       scope: jakarta.enterprise.context.ApplicationScoped
@@ -204,26 +252,29 @@ quarkus:
       scope: jakarta.enterprise.context.ApplicationScoped
       auth:
         basic:
-          username: ${TWILIO_ACCOUNT_SID}
-          password: ${TWILIO_AUTH_TOKEN}
+          # Claves inyectadas desde walrex/app/twilio
+          username: ${twilio-account-sid}
+          password: ${twilio-auth-token}
       read-timeout: 10000
       connect-timeout: 5000
+
   qdrant:
-    dimension: 1536  # Must match embedding-model dimensions (text-embedding-3-small)
+    dimension: 1536
     distance: Cosine
     collection:
       name: accounting_data
 
-
 google:
   cloud:
-    service-account-location: firebase-service-account.json
-
+    # Ruta al archivo en el servidor (fuera del classpath); la ruta
+    # se almacena en Vault (walrex/app/fcm → fcm-credentials-path)
+    service-account-location: ${fcm-credentials-path:/etc/walrex/firebase-service-account.json}
 
 azure:
   doc:
     intel:
-      key: ${AZURE_DOC_INTEL_KEY:your-azure-key-here}
+      # Clave inyectada desde walrex/app/apis
+      key: ${azure-doc-intel-key}
 
 embeddings:
   sync:
@@ -251,23 +302,59 @@ rag:
 app:
   registration:
     token:
-      secret: ${REGISTRATION_TOKEN_SECRET}
+      # Clave inyectada desde walrex/app/jwt
+      secret: ${registration-token-secret}
       expiration-minutes: 10
   login:
     max-attempts: 5
     lockout-minutes: 15
   twilio:
-    account-sid: ${TWILIO_ACCOUNT_SID:ACxxx}
-    auth-token: ${TWILIO_AUTH_TOKEN:xxx}
-    from-number: ${TWILIO_FROM_NUMBER:+123456789}
-    whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+123456789}
+    # Claves inyectadas desde walrex/app/twilio
+    account-sid: ${twilio-account-sid}
+    auth-token: ${twilio-auth-token}
+    from-number: ${twilio-from-number}
+    whatsapp-from: ${twilio-whatsapp-from}
 
 mp:
   jwt:
     verify:
       issuer: https://walrex.org/issuer
-    secret: ${JWT_SECRET}
+    # Clave inyectada desde walrex/app/jwt
+    secret: ${jwt-secret}
 
 fcm:
   enabled: true
-  credentials-file: firebase-service-account.json
+  # Ruta inyectada desde walrex/app/fcm
+  credentials-file: ${fcm-credentials-path:/etc/walrex/firebase-service-account.json}
+
+screening:
+  threshold:
+    block: ${SCREENING_THRESHOLD_BLOCK:8.0}
+    review: ${SCREENING_THRESHOLD_REVIEW:4.0}
+
+astropay:
+  margin-percent: ${ASTROPAY_MARGIN_PERCENT:6}
+
+finnhub:
+  # Clave inyectada desde walrex/app/apis
+  api-token: ${finnhub-api-token}
+  symbol-provider: ${FINNHUB_SYMBOL_PROVIDER:OANDA}
+  reconnect-delay-ms: ${FINNHUB_RECONNECT_DELAY_MS:5000}
+  price-change-threshold: ${FINNHUB_PRICE_CHANGE_THRESHOLD:2.5}
+
+binance:
+  spot:
+    stream:
+      symbol: ${BINANCE_SPOT_SYMBOL:btcusdt}
+      price-change-threshold: ${BINANCE_SPOT_THRESHOLD:1.5}
+      cooldown-minutes: ${BINANCE_SPOT_COOLDOWN_MINUTES:5}
+      reconnect-delay-ms: ${BINANCE_SPOT_RECONNECT_DELAY_MS:5000}
+
+walrex:
+  scheduler:
+    exchange-rate:
+      cron: "off"
+      initial:
+        every: "off"
+    market-sync:
+      every: ${MARKET_SYNC_EVERY:24h}

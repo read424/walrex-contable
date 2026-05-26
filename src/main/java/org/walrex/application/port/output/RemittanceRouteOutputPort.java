@@ -27,4 +27,13 @@ public interface RemittanceRouteOutputPort {
      * @return Uni con la lista de ExchangeRateRouteInfo
      */
     Uni<List<ExchangeRateRouteInfo>> findAllActiveExchangeRateRoutes();
+
+    /**
+     * Obtiene las rutas activas filtradas por proveedor de tasa de cambio.
+     * Usado por el adapter de Finnhub para saber qué pares suscribir.
+     *
+     * @param provider ej: "ASTROPAY", "BINANCE"
+     * @return Uni con la lista de rutas del proveedor indicado
+     */
+    Uni<List<ExchangeRateRouteInfo>> findActiveRoutesByProvider(String provider);
 }

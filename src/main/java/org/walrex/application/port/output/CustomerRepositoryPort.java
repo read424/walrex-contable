@@ -3,6 +3,9 @@ package org.walrex.application.port.output;
 import io.smallrye.mutiny.Uni;
 import org.walrex.domain.model.Customer;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+
 public interface CustomerRepositoryPort {
 
     /**
@@ -65,4 +68,7 @@ public interface CustomerRepositoryPort {
      *         eliminado
      */
     Uni<Boolean> restore(Integer id);
+
+    Uni<Void> updateScreeningResult(Integer clientId, String decision, BigDecimal score,
+                                    String datasets, String entityId, OffsetDateTime checkedAt);
 }
