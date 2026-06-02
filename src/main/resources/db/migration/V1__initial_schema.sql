@@ -246,7 +246,9 @@ CREATE TABLE IF NOT EXISTS type_document_id (
     sigla      VARCHAR(7)  NOT NULL UNIQUE,
     det_name   VARCHAR(50) NOT NULL UNIQUE,
     status     CHAR(1)     NOT NULL DEFAULT '1',
-    country_id INTEGER     NOT NULL REFERENCES country(id)
+    country_id INTEGER     NOT NULL REFERENCES country(id),
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS financial_institution (
@@ -289,6 +291,17 @@ CREATE TABLE IF NOT EXISTS country_currencies (
     effective_date DATE,
     created_at     TIMESTAMPTZ,
     CONSTRAINT uk_country_currency UNIQUE (country_id, currency_id)
+);
+
+CREATE TABLE IF NOT EXISTS trading_currencies (
+    id                BIGSERIAL PRIMARY KEY,
+    id_company        INTEGER,
+    id_currency_base  INTEGER NOT NULL REFERENCES currencies(id),
+    id_currency_quote INTEGER NOT NULL REFERENCES currencies(id),
+    porc_revenue      NUMERIC(10,3),
+    status            CHAR(1) DEFAULT '1',
+    created_at        TIMESTAMPTZ,
+    updated_at        TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS wallet_country_config (
@@ -436,6 +449,14 @@ CREATE TABLE IF NOT EXISTS client_screening_history (
     checked_at         TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_screening_history_client ON client_screening_history (client_id);
+
+CREATE TABLE IF NOT EXISTS user_types (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(50)  NOT NULL UNIQUE,
+    description VARCHAR(200),
+    is_active   CHAR(1)      DEFAULT '1',
+    created_at  TIMESTAMPTZ
+);
 
 CREATE TABLE IF NOT EXISTS users (
     id                   SERIAL PRIMARY KEY,
