@@ -13,6 +13,28 @@ quarkus:
     enabled: false
   test:
     integration-test-profile: test
+  vault:
+    url: ${VAULT_URL:http://127.0.0.1:8200}
+    authentication:
+      client-token: ${VAULT_TOKEN:myroot}
+    kv-secret-engine-mount-path: secret
+    kv-secret-engine-version: 2
+    secret-config-kv-path:
+      - walrex/infra/database
+      - walrex/infra/redis
+      - walrex/infra/azure
+      - walrex/infra/qdrant
+      - walrex/app/openai
+      - walrex/app/finnhub
+      - walrex/app/groq
+      - walrex/app/hugging-face
+      - walrex/app/jwt
+      - walrex/app/twilio
+      - walrex/app/fcm
+    # MEDIUM oculta valores en logs; usar LOW solo en dev local
+    log-confidentiality-level: MEDIUM
+    devservices:
+      enabled: false
   hibernate-orm:
     log:
       sql: true
@@ -48,26 +70,27 @@ quarkus:
     baseline-version: "0"
     repair-at-start: true
   datasource:
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:12345}
+    username: ${db-username:postgres}
+    password: ${db-password:12345}
     jdbc:
-      url: jdbc:postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
+      url: jdbc:postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db_prod}
       min-size: 1
       max-size: 4
     reactive:
-      url: postgresql://${DB_HOST:127.0.0.1}:5432/${DB_NAME:walrex_db}
-  # ---------------------------------------------------------------------------
-  # Vault — modo desarrollo
-  # Levanta un servidor local: vault server -dev -dev-root-token-id=dev-root-token
-  # Luego carga secrets con: docs/vault/seed-dev-secrets.sh
-  # ---------------------------------------------------------------------------
-  vault:
-    url: ${VAULT_URL:http://127.0.0.1:8200}
-    authentication:
-      client-token: ${VAULT_TOKEN:myroot}
-    log-confidentiality-level: LOW
-    devservices:
-      enabled: false
+      url: postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db_prod}
+  mailer:
+    password: dev-mail-password
+  langchain4j:
+    openai:
+      api-key: dev-openai-key
+      groq-chat:
+        api-key: dev-groq-key
+  rest-client:
+    twilio-api:
+      auth:
+        basic:
+          username: dev-twilio-sid
+          password: dev-twilio-token
 
   otel:
     sdk:
@@ -78,3 +101,31 @@ quarkus:
       json: false      # texto plano en dev, más legible en consola
 
   smallrye-fault-tolerance:
+
+mp:
+  jwt:
+    secret: dev-jwt-secret-local-32-chars-min-ok-padding
+
+app:
+  registration:
+    token:
+      secret: dev-registration-secret-local
+  twilio:
+    account-sid: dev-twilio-sid
+    auth-token: dev-twilio-token
+    from-number: "+10000000000"
+    whatsapp-from: "whatsapp:+10000000000"
+
+google:
+  cloud:
+    # Ruta al archivo en el servidor (fuera del classpath); la ruta
+    # se almacena en Vault (walrex/app/fcm → fcm-credentials-path)
+    service-account-location: ${fcm-credentials-path:/etc/walrex/firebase-service-account.json}
+
+azure:
+  doc:
+    intel:
+      key: dev-azure-key
+
+finnhub:
+  api-token: dev-finnhub-token

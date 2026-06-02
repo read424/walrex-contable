@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS country (
     name_iso       VARCHAR(100),
     code_phone_iso VARCHAR(10),
     status         VARCHAR(10),
-    unicode_flag   VARCHAR(10),
+    unicode_flag   VARCHAR(30),
     created_at     TIMESTAMPTZ,
     updated_at     TIMESTAMPTZ,
     deleted_at     TIMESTAMPTZ,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS system_document_types (
 );
 
 CREATE TABLE IF NOT EXISTS ocupaciones (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id         BIGSERIAL PRIMARY KEY,
     codigo     VARCHAR(5)   NOT NULL UNIQUE,
     nombre     VARCHAR(120) NOT NULL UNIQUE,
     status     INTEGER      DEFAULT 1,
@@ -246,7 +246,9 @@ CREATE TABLE IF NOT EXISTS type_document_id (
     sigla      VARCHAR(7)  NOT NULL UNIQUE,
     det_name   VARCHAR(50) NOT NULL UNIQUE,
     status     CHAR(1)     NOT NULL DEFAULT '1',
-    country_id INTEGER     NOT NULL REFERENCES country(id)
+    country_id INTEGER     NOT NULL REFERENCES country(id),
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS financial_institution (
@@ -289,6 +291,17 @@ CREATE TABLE IF NOT EXISTS country_currencies (
     effective_date DATE,
     created_at     TIMESTAMPTZ,
     CONSTRAINT uk_country_currency UNIQUE (country_id, currency_id)
+);
+
+CREATE TABLE IF NOT EXISTS trading_currencies (
+    id                BIGSERIAL PRIMARY KEY,
+    id_company        INTEGER,
+    id_currency_base  INTEGER NOT NULL REFERENCES currencies(id),
+    id_currency_quote INTEGER NOT NULL REFERENCES currencies(id),
+    porc_revenue      NUMERIC(10,3),
+    status            CHAR(1) DEFAULT '1',
+    created_at        TIMESTAMPTZ,
+    updated_at        TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS wallet_country_config (
@@ -437,6 +450,14 @@ CREATE TABLE IF NOT EXISTS client_screening_history (
 );
 CREATE INDEX IF NOT EXISTS idx_screening_history_client ON client_screening_history (client_id);
 
+CREATE TABLE IF NOT EXISTS user_types (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(50)  NOT NULL UNIQUE,
+    description VARCHAR(200),
+    is_active   CHAR(1)      DEFAULT '1',
+    created_at  TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id                   SERIAL PRIMARY KEY,
     id_client            INTEGER      NOT NULL,
@@ -446,12 +467,14 @@ CREATE TABLE IF NOT EXISTS users (
     pin_attempts         INTEGER      NOT NULL DEFAULT 0,
     pin_locked_until     TIMESTAMPTZ,
     status               INTEGER      DEFAULT 1,
+    last_login_at        TIMESTAMPTZ,
     device_trusted       BOOLEAN      DEFAULT FALSE,
     biometric_enabled    BOOLEAN      DEFAULT FALSE,
     biometric_enrolled_at TIMESTAMPTZ,
     biometric_type       VARCHAR(50),
     mfa_enabled          BOOLEAN      NOT NULL DEFAULT FALSE,
     mfa_type             VARCHAR(50),
+    mfa_enrolled_at      TIMESTAMPTZ,
     created_at           TIMESTAMPTZ,
     updated_at           TIMESTAMPTZ,
     CONSTRAINT users_username_unique UNIQUE (username)
