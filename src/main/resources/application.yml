@@ -51,14 +51,14 @@ quarkus:
       enabled: false
     db-kind: postgresql
     # Claves inyectadas desde walrex/infra/database
-    username: ${db-username}
-    password: ${db-password}
+    username: db-username
+    password: db-password
     jdbc:
-      url: jdbc:postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
+      url: jdbc:postgresql://db-host:5432/db-name
       min-size: 2
       max-size: 8
     reactive:
-      url: postgresql://${db-host:127.0.0.1}:5432/${db-name:walrex_db}
+      url: postgresql://db-host:5432/db-name
       max-size: 20
 
   swagger-ui:
