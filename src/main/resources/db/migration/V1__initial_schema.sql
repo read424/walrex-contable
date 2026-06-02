@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS system_document_types (
 );
 
 CREATE TABLE IF NOT EXISTS ocupaciones (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id         BIGSERIAL PRIMARY KEY,
     codigo     VARCHAR(5)   NOT NULL UNIQUE,
     nombre     VARCHAR(120) NOT NULL UNIQUE,
     status     INTEGER      DEFAULT 1,
