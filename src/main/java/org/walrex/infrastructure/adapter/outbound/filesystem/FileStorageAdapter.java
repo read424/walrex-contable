@@ -2,16 +2,14 @@ package org.walrex.infrastructure.adapter.outbound.filesystem;
 
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.walrex.application.port.output.FileStoragePort;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -19,6 +17,7 @@ import java.util.UUID;
 /**
  * Implementation of FileStoragePort that stores files in the local filesystem.
  * Files are organized by date: /uploads/journal-entries/YYYY/MM/DD/
+ * FULLY REACTIVE - No blocking I/O operations
  */
 @Slf4j
 @ApplicationScoped
@@ -27,68 +26,58 @@ public class FileStorageAdapter implements FileStoragePort {
     @ConfigProperty(name = "file.storage.base-path", defaultValue = "./uploads")
     String basePath;
 
+    @Inject
+    ReactiveFileSystemService fileSystemService;
+
     private static final String JOURNAL_ENTRY_FOLDER = "journal-entries";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     @Override
     public Uni<StoredFileInfo> store(InputStream inputStream, String originalFilename, String mimeType, Long fileSize) {
         return Uni.createFrom().item(() -> {
-            try {
-                // Generate unique filename using UUID
-                String extension = getFileExtension(originalFilename);
-                String storedFilename = UUID.randomUUID().toString() + (extension.isEmpty() ? "" : "." + extension);
+            String extension = getFileExtension(originalFilename);
+            String storedFilename = UUID.randomUUID().toString() + (extension.isEmpty() ? "" : "." + extension);
 
-                // Create date-based directory structure
-                LocalDate now = LocalDate.now();
-                String datePath = now.format(DATE_FORMATTER);
-                Path directory = Paths.get(basePath, JOURNAL_ENTRY_FOLDER, datePath);
+            LocalDate now = LocalDate.now();
+            String datePath = now.format(DATE_FORMATTER);
+            Path directory = Paths.get(basePath, JOURNAL_ENTRY_FOLDER, datePath);
+            Path filePath = directory.resolve(storedFilename);
 
-                // Create directories if they don't exist
-                Files.createDirectories(directory);
+            return new Object[]{filePath, directory, storedFilename};
+        })
+        .flatMap(data -> {
+            Path filePath = (Path) ((Object[]) data)[0];
+            Path directory = (Path) ((Object[]) data)[1];
+            String storedFilename = (String) ((Object[]) data)[2];
 
-                // Full path to store the file
-                Path filePath = directory.resolve(storedFilename);
-
-                // Copy file to destination
-                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-
-                log.info("File stored successfully: {} -> {}", originalFilename, filePath);
-
-                return new StoredFileInfo(storedFilename, filePath.toString());
-            } catch (IOException e) {
-                log.error("Error storing file: {}", originalFilename, e);
-                throw new RuntimeException("Failed to store file: " + e.getMessage(), e);
-            }
+            return fileSystemService.createDirectories(directory)
+                .flatMap(v -> fileSystemService.copyFromInputStream(inputStream, filePath))
+                .invoke(() -> log.info("File stored successfully: {} -> {}", originalFilename, filePath))
+                .map(bytesWritten -> new StoredFileInfo(storedFilename, filePath.toString()))
+                .onFailure().invoke(error -> log.error("Error storing file: {}", originalFilename, error));
         });
     }
 
     @Override
     public Uni<Boolean> delete(String filePath) {
-        return Uni.createFrom().item(() -> {
-            try {
-                Path path = Paths.get(filePath);
-                boolean deleted = Files.deleteIfExists(path);
-
-                if (deleted) {
-                    log.info("File deleted successfully: {}", filePath);
-                } else {
-                    log.warn("File not found for deletion: {}", filePath);
-                }
-
-                return deleted;
-            } catch (IOException e) {
-                log.error("Error deleting file: {}", filePath, e);
-                return false;
-            }
-        });
+        Path path = Paths.get(filePath);
+        return fileSystemService.deleteIfExists(path)
+                .invoke(deleted -> {
+                    if (deleted) {
+                        log.info("File deleted successfully: {}", filePath);
+                    } else {
+                        log.warn("File not found for deletion: {}", filePath);
+                    }
+                })
+                .onFailure().invoke(error -> log.error("Error deleting file: {}", filePath, error))
+                .onFailure().recoverWithItem(false);
     }
 
     @Override
     public Uni<Boolean> exists(String filePath) {
-        return Uni.createFrom().item(() -> {
-            Path path = Paths.get(filePath);
-            return Files.exists(path);
-        });
+        Path path = Paths.get(filePath);
+        return fileSystemService.exists(path)
+                .onFailure().recoverWithItem(false);
     }
 
     @Override

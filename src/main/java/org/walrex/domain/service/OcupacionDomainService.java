@@ -99,13 +99,15 @@ public class OcupacionDomainService implements OcupacionUseCase {
     public Uni<List<OcupacionResponse>> findAllOcupaciones(Integer page, Integer size, String nombreFilter) {
         log.debug("Finding all ocupaciones with page: {}, size: {}, nameFilter: {}", page, size, nombreFilter);
         String cacheKey = cacheKeyGenerator.generateKeyForFindAllPaginated(page, size, nombreFilter);
-        
+
         return cachePort.<OcupacionResponse>getList(cacheKey)
                 .onItem().ifNull().switchTo(() ->
                     ocupacionRepositoryPort.findAll(page, size, nombreFilter)
-                        .map(ocupaciones -> ocupaciones.stream()
-                                .map(ocupacionRestMapper::toResponse)
-                                .collect(Collectors.toList()))
+                        .chain(ocupaciones ->
+                            io.smallrye.mutiny.Multi.createFrom().iterable(ocupaciones)
+                                    .map(ocupacionRestMapper::toResponse)
+                                    .collect().asList()
+                        )
                         .call(ocupacionResponses -> {
                             if (!ocupacionResponses.isEmpty()) {
                                 return cachePort.putList(cacheKey, ocupacionResponses, CACHE_TTL);
@@ -124,15 +126,17 @@ public class OcupacionDomainService implements OcupacionUseCase {
         return cachePort.<OcupacionResponse>getList(cacheKey)
                 .onItem().ifNull().switchTo(() ->
                     ocupacionRepositoryPort.findAllNoPaginated(nombreFilter)
-                        .map(ocupaciones -> ocupaciones.stream()
-                                .map(ocupacionRestMapper::toResponse)
-                                .collect(Collectors.toList()))
-                            .call(ocupacionResponses -> {
-                                if (!ocupacionResponses.isEmpty()) {
-                                    return cachePort.putList(cacheKey, ocupacionResponses, CACHE_TTL);
-                                }
-                                return Uni.createFrom().voidItem();
-                            })
+                        .chain(ocupaciones ->
+                            io.smallrye.mutiny.Multi.createFrom().iterable(ocupaciones)
+                                    .map(ocupacionRestMapper::toResponse)
+                                    .collect().asList()
+                        )
+                        .call(ocupacionResponses -> {
+                            if (!ocupacionResponses.isEmpty()) {
+                                return cachePort.putList(cacheKey, ocupacionResponses, CACHE_TTL);
+                            }
+                            return Uni.createFrom().voidItem();
+                        })
                 );
     }
 

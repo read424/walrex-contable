@@ -13,14 +13,15 @@ import org.walrex.domain.exception.DocumentUnreadableException;
 import org.walrex.domain.exception.UnsupportedDocumentFormatException;
 import org.walrex.domain.model.DocumentAnalysisResult;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
+import org.walrex.infrastructure.adapter.outbound.filesystem.ReactiveFileSystemService;
 
-import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 
 /**
  * Servicio de dominio que implementa el caso de uso de análisis de documentos.
  * Orquesta la validación y el procesamiento de documentos mediante Azure Document Intelligence.
+ * FULLY REACTIVE - No blocking I/O operations
  */
 @Slf4j
 @ApplicationScoped
@@ -38,39 +39,32 @@ public class DocumentAnalysisService implements AnalyzeDocumentUseCase {
     @Inject
     DocumentIntelligencePort documentIntelligencePort;
 
+    @Inject
+    ReactiveFileSystemService fileSystemService;
+
     @Override
     @WithSpan("DocumentAnalysisService.analyzeDocument")
     @LogExecutionTime(value = LogExecutionTime.LogLevel.INFO, logParameters = true)
     public Uni<DocumentAnalysisResult> analyzeDocument(FileUpload fileUpload) {
         log.info("Analyzing document: {}", fileUpload.fileName());
 
-        try {
-            // Leer el contenido del archivo
-            byte[] documentBytes = Files.readAllBytes(fileUpload.filePath());
+        String fileName = fileUpload.fileName();
+        String contentType = fileUpload.contentType();
+        Path filePath = fileUpload.filePath();
 
-            // Validar tamaño
-            validateFileSize(documentBytes.length, fileUpload.fileName());
-
-            // Validar formato
-            String contentType = fileUpload.contentType();
-            validateContentType(contentType, fileUpload.fileName());
-
-            // Delegar al puerto de salida
-            return documentIntelligencePort.analyzeInvoice(documentBytes, contentType)
-                    .onFailure().transform(throwable -> {
-                        log.error("Error analyzing document: {}", fileUpload.fileName(), throwable);
-                        return new DocumentUnreadableException(
-                                "Error al analizar el documento: " + fileUpload.fileName(),
-                                throwable
-                        );
-                    });
-
-        } catch (IOException e) {
-            log.error("Error reading file: {}", fileUpload.fileName(), e);
-            return Uni.createFrom().failure(
-                    new DocumentUnreadableException("No se pudo leer el archivo: " + fileUpload.fileName(), e)
-            );
-        }
+        return fileSystemService.readFile(filePath)
+                .chain(documentBytes -> {
+                    validateFileSize(documentBytes.length, fileName);
+                    validateContentType(contentType, fileName);
+                    return documentIntelligencePort.analyzeInvoice(documentBytes, contentType);
+                })
+                .onFailure().transform(throwable -> {
+                    log.error("Error analyzing document: {}", fileName, throwable);
+                    return new DocumentUnreadableException(
+                            "Error al analizar el documento: " + fileName,
+                            throwable
+                    );
+                });
     }
 
     @Override

@@ -33,7 +33,7 @@ public class EmbeddingGeneratorService implements GenerateIntentEmbeddingsUseCas
     Vertx vertx;
 
     @Inject
-    EmbeddingDebugLogger debugLogger;
+    org.walrex.infrastructure.adapter.outbound.logging.AsyncFileLogger debugLogger;
 
     /**
      * Genera un embedding vectorial para un texto dado.
@@ -122,87 +122,92 @@ public class EmbeddingGeneratorService implements GenerateIntentEmbeddingsUseCas
 
     /**
      * Genera embedding para un intent promediando los embeddings de sus frases de ejemplo.
-     * Patrón: Genera embeddings (blocking) → Recarga entity en nueva TX → Persiste
+     * FULLY REACTIVE - Los logs se envían de forma asincrónica sin bloquear
      *
      * @param intentId ID del intent (para recarga en transacción de escritura)
      * @param intentName Nombre del intent (para logging)
      * @param examplePhrases Frases de ejemplo para generar embedding
      */
     private Uni<Boolean> generateAndSaveEmbedding(Long intentId, String intentName, String[] examplePhrases) {
-        debugLogger.logStart(intentName, examplePhrases != null ? examplePhrases.length : 0);
         log.info("🔄 [{}] Starting embedding generation - {} example phrases", intentName,
                 examplePhrases != null ? examplePhrases.length : 0);
 
         if (examplePhrases == null || examplePhrases.length == 0) {
             log.warn("⚠️  [{}] No example phrases, skipping", intentName);
-            debugLogger.logComplete(intentName, false);
-            return Uni.createFrom().item(false);
+            return debugLogger.logComplete(intentName, false)
+                    .replaceWith(false);
         }
 
-        // 1. Generar embeddings (FUERA de transacción - incluye llamadas bloqueantes a Ollama)
+        return debugLogger.logStart(intentName, examplePhrases.length)
+                .chain(v -> generateEmbeddingsForPhrases(intentName, examplePhrases))
+                .chain(embeddings -> averageAndSaveEmbedding(intentName, intentId, embeddings))
+                .onFailure().recoverWithUni(error -> {
+                    log.error("❌ [{}] FAILED to generate embedding", intentName, error);
+                    return debugLogger.logError(intentName, "UNKNOWN", error)
+                            .replaceWith(false);
+                })
+                .invoke(success -> {
+                    if (success) {
+                        debugLogger.logComplete(intentName, true)
+                                .subscribe().with(v -> {});
+                    }
+                });
+    }
+
+    private Uni<List<float[]>> generateEmbeddingsForPhrases(String intentName, String[] examplePhrases) {
         return Multi.createFrom().iterable(Arrays.asList(examplePhrases))
                 .onItem().transformToUniAndConcatenate(phrase ->
-                        embeddingAdapter.generateEmbedding(phrase)  // Ejecuta en worker pool
+                        embeddingAdapter.generateEmbedding(phrase)
                                 .invoke(emb -> {
-                                    debugLogger.logEmbeddingGenerated(intentName, phrase, emb.length);
+                                    debugLogger.logEmbeddingGenerated(intentName, phrase, emb.length)
+                                            .subscribe().with(v -> {});
                                     log.debug("[{}] ✓ Generated embedding: {} dims", intentName, emb.length);
                                 })
                 )
                 .collect().asList()
                 .invoke(embeddings -> {
-                    debugLogger.logAveraged(intentName, embeddings.size(),
-                            embeddings.isEmpty() ? 0 : embeddings.get(0).length);
                     log.info("[{}] Generated {} embeddings, averaging...", intentName, embeddings.size());
-                })
-                .map(this::averageEmbeddings)
-                // 2. Volver explícitamente al event-loop de Vert.x antes de DB operation
+                    debugLogger.logAveraged(intentName, embeddings.size(),
+                            embeddings.isEmpty() ? 0 : embeddings.get(0).length)
+                            .subscribe().with(v -> {});
+                });
+    }
+
+    private Uni<Boolean> averageAndSaveEmbedding(String intentName, Long intentId, List<float[]> embeddings) {
+        float[] averageEmbedding = averageEmbeddings(embeddings);
+
+        String fromThread = Thread.currentThread().getName();
+
+        return debugLogger.logTransactionStart(intentName)
+                .chain(v -> Uni.createFrom().item(() -> {
+                    log.info("[{}] 💾 Starting DB transaction to save embedding", intentName);
+                    return averageEmbedding;
+                }))
                 .emitOn(command -> {
-                    String fromThread = Thread.currentThread().getName();
                     vertx.getOrCreateContext().runOnContext(v -> {
                         String toThread = Thread.currentThread().getName();
-                        debugLogger.logThreadSwitch(intentName, fromThread, toThread);
+                        debugLogger.logThreadSwitch(intentName, fromThread, toThread)
+                                .subscribe().with(vv -> {});
                         command.run();
                     });
                 })
-                // 3. Persistir en nueva transacción dedicada (recargar entity + actualizar)
-                .chain(averageEmbedding -> {
-                    debugLogger.logTransactionStart(intentName);
-                    log.info("[{}] 💾 Starting DB transaction to save embedding", intentName);
-
-                    // Usar UPDATE nativo para evitar bug de Hibernate Reactive con PGvector
-                    return Panache.withTransaction(() -> {
-                        return intentPersistence.updateEmbedding(intentId, averageEmbedding)
-                                .invoke(rowsUpdated -> {
-                                    debugLogger.logEmbeddingSet(intentName, averageEmbedding.length);
-                                    log.info("[{}] ✅ Updated embedding ({} dimensions) - {} rows affected",
-                                            intentName, averageEmbedding.length, rowsUpdated);
-                                })
-                                .chain(rowsUpdated -> {
-                                    if (rowsUpdated == 0) {
-                                        return Uni.createFrom().failure(
-                                                new IllegalStateException("Intent disappeared: " + intentName));
-                                    }
-                                    debugLogger.logTransactionCommit(intentName);
-                                    log.info("[{}] ✅ Transaction committed successfully", intentName);
-                                    return Uni.createFrom().item(rowsUpdated);
-                                });
-                    })
-                    .map(rowsUpdated -> true);
-                })
-                .onFailure().invoke(error -> {
-                    debugLogger.logError(intentName, "UNKNOWN", error);
-                    log.error("❌ [{}] FAILED to generate embedding", intentName, error);
-                })
-                .onFailure().recoverWithItem(error -> {
-                    debugLogger.logComplete(intentName, false);
-                    log.error("❌ [{}] Recovering from failure, returning false", intentName);
-                    return false;
-                })
-                .invoke(success -> {
-                    if (success) {
-                        debugLogger.logComplete(intentName, true);
-                    }
-                });
+                .chain(avgEmb -> Panache.withTransaction(() ->
+                    intentPersistence.updateEmbedding(intentId, avgEmb)
+                            .chain(rowsUpdated -> {
+                                if (rowsUpdated == 0) {
+                                    return Uni.createFrom().failure(
+                                            new IllegalStateException("Intent disappeared: " + intentName));
+                                }
+                                log.info("[{}] ✅ Updated embedding ({} dimensions) - {} rows affected",
+                                        intentName, avgEmb.length, rowsUpdated);
+                                debugLogger.logEmbeddingSet(intentName, avgEmb.length)
+                                        .subscribe().with(v -> {});
+                                debugLogger.logTransactionCommit(intentName)
+                                        .subscribe().with(v -> {});
+                                return Uni.createFrom().item(true);
+                            })
+                ))
+                .onFailure().recoverWithItem(false);
     }
 
     /**
