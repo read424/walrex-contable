@@ -15,15 +15,15 @@ import org.walrex.domain.model.JournalEntry;
 import org.walrex.domain.model.JournalEntryDocument;
 import org.walrex.domain.model.JournalEntryLine;
 import org.walrex.infrastructure.adapter.logging.LogExecutionTime;
+import org.walrex.infrastructure.adapter.outbound.filesystem.ReactiveFileSystemService;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 /**
  * Servicio para sincronizar asientos contables históricos a Qdrant.
  * Esto permite que el RAG aprenda de asientos previos.
+ * FULLY REACTIVE - No blocking file I/O operations
  */
 @Slf4j
 @ApplicationScoped
@@ -43,6 +43,9 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
 
     @Inject
     HashService hashService;
+
+    @Inject
+    ReactiveFileSystemService fileSystemService;
 
     @ConfigProperty(name = "rag.historical.auto-sync-enabled", defaultValue = "true")
     Boolean autoSyncEnabled;
@@ -68,40 +71,36 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
 
                     JournalEntry entry = optionalEntry.get();
 
-                    // Buscar documentos adjuntos en las líneas del asiento
-                    String imageHash = extractImageHashFromEntry(entry);
+                    return extractImageHashFromEntry(entry)
+                            .flatMap(imageHash -> {
+                                if (imageHash != null) {
+                                    log.info("Found document attachment in entry {}. Trying to reuse cached embedding with hash: {}",
+                                            journalEntryId, imageHash);
 
-                    if (imageHash != null) {
-                        log.info("Found document attachment in entry {}. Trying to reuse cached embedding with hash: {}",
-                                journalEntryId, imageHash);
-
-                        // Intentar recuperar embedding del caché
-                        return embeddingCache.get(imageHash, entry.getBookType())
-                                .onItem().transformToUni(cachedEmbedding -> {
-                                    if (cachedEmbedding != null) {
-                                        log.info("✅ Embedding cache HIT! Reusing cached embedding for entry {}",
-                                                journalEntryId);
-                                        // REUTILIZAR embedding del caché
-                                        return chunkingService.createHistoricalChunkFromCache(
-                                                entry,
-                                                cachedEmbedding.getEmbedding(),
-                                                imageHash
-                                        );
-                                    } else {
-                                        log.info("Embedding cache MISS for entry {}. Generating new embedding",
-                                                journalEntryId);
-                                        // Fallback: generar nuevo embedding pero guardar el hash
-                                        return chunkingService.createHistoricalChunk(entry, imageHash);
-                                    }
-                                })
-                                .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
-                    } else {
-                        log.debug("No document attachments found in entry {}. Generating embedding without cache",
-                                journalEntryId);
-                        // Sin documentos adjuntos, crear chunk normal
-                        return chunkingService.createHistoricalChunk(entry, null)
-                                .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
-                    }
+                                    return embeddingCache.get(imageHash, entry.getBookType())
+                                            .onItem().transformToUni(cachedEmbedding -> {
+                                                if (cachedEmbedding != null) {
+                                                    log.info("✅ Embedding cache HIT! Reusing cached embedding for entry {}",
+                                                            journalEntryId);
+                                                    return chunkingService.createHistoricalChunkFromCache(
+                                                            entry,
+                                                            cachedEmbedding.getEmbedding(),
+                                                            imageHash
+                                                    );
+                                                } else {
+                                                    log.info("Embedding cache MISS for entry {}. Generating new embedding",
+                                                            journalEntryId);
+                                                    return chunkingService.createHistoricalChunk(entry, imageHash);
+                                                }
+                                            })
+                                            .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
+                                } else {
+                                    log.debug("No document attachments found in entry {}. Generating embedding without cache",
+                                            journalEntryId);
+                                    return chunkingService.createHistoricalChunk(entry, null)
+                                            .chain(chunk -> vectorStorePort.upsertHistoricalEntryChunk(chunk));
+                                }
+                            });
                 })
                 .onItem().invoke(() ->
                         log.info("Successfully synced journal entry {} to Qdrant", journalEntryId)
@@ -114,40 +113,38 @@ public class HistoricalEntriesSyncService implements SyncHistoricalEntriesUseCas
     /**
      * Extrae el hash SHA-256 del primer documento adjunto encontrado en las líneas del asiento.
      * Si no hay documentos, retorna null.
+     * REACTIVE - Non-blocking file I/O
      *
      * @param entry Asiento contable con posibles documentos adjuntos
-     * @return Hash SHA-256 del primer documento, o null si no hay documentos
+     * @return Uni<String> Hash SHA-256 del primer documento, o null si no hay documentos
      */
-    private String extractImageHashFromEntry(JournalEntry entry) {
+    private Uni<String> extractImageHashFromEntry(JournalEntry entry) {
         if (entry.getLines() == null || entry.getLines().isEmpty()) {
-            return null;
+            return Uni.createFrom().nullItem();
         }
 
-        // Buscar el primer documento adjunto en cualquier línea
         for (JournalEntryLine line : entry.getLines()) {
             if (line.getDocuments() != null && !line.getDocuments().isEmpty()) {
                 JournalEntryDocument firstDoc = line.getDocuments().getFirst();
+                Path filePath = Path.of(firstDoc.getFilePath());
 
-                try {
-                    // Leer el archivo y generar hash
-                    Path filePath = Path.of(firstDoc.getFilePath());
-
-                    if (Files.exists(filePath)) {
-                        byte[] fileBytes = Files.readAllBytes(filePath);
-                        String hash = hashService.generateSHA256(fileBytes);
-
-                        log.debug("Generated hash {} for document: {}", hash, firstDoc.getOriginalFilename());
-                        return hash;
-                    } else {
-                        log.warn("Document file not found: {}", filePath);
-                    }
-                } catch (IOException e) {
-                    log.error("Error reading document file: {}", firstDoc.getFilePath(), e);
-                }
+                return fileSystemService.exists(filePath)
+                        .flatMap(exists -> {
+                            if (exists) {
+                                return fileSystemService.readFile(filePath)
+                                        .map(fileBytes -> hashService.generateSHA256(fileBytes))
+                                        .invoke(hash -> log.debug("Generated hash {} for document: {}", hash, firstDoc.getOriginalFilename()));
+                            } else {
+                                log.warn("Document file not found: {}", filePath);
+                                return Uni.createFrom().nullItem();
+                            }
+                        })
+                        .onFailure().invoke(error -> log.error("Error reading document file: {}", firstDoc.getFilePath(), error))
+                        .onFailure().recoverWithNull();
             }
         }
 
-        return null;
+        return Uni.createFrom().nullItem();
     }
 
 

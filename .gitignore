@@ -51,3 +51,7 @@ logs/
 uploads/
 
 firebase-service-account.json
+
+# Build output and reports
+build-output.log
+odc-reports/

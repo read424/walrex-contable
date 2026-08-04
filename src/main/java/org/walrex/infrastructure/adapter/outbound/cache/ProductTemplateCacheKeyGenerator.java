@@ -2,10 +2,7 @@ package org.walrex.infrastructure.adapter.outbound.cache;
 
 import org.walrex.application.dto.query.PageRequest;
 import org.walrex.application.dto.query.ProductTemplateFilter;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import org.walrex.infrastructure.util.HashingUtils;
 
 /**
  * Generador de claves de cache para ProductTemplate.
@@ -108,21 +105,6 @@ public class ProductTemplateCacheKeyGenerator {
      * Genera un hash SHA-256 de la clave para mantenerla corta y única.
      */
     private static String hashKey(String key) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(key.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            return PREFIX + ":" + hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            // Fallback to the original key if SHA-256 is not available
-            return key;
-        }
+        return HashingUtils.hashSha256(key);
     }
 }
